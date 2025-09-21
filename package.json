@@ -1,0 +1,27 @@
+{
+  "name": "tesisfinal2025",
+  "version": "1.0.0",
+  "description": "Lado backend de proyeto final de carrera de desarrollo web",
+  "homepage": "https://github.com/GermanMetzger/TesisFinal2025#readme",
+  "bugs": {
+    "url": "https://github.com/GermanMetzger/TesisFinal2025/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GermanMetzger/TesisFinal2025.git"
+  },
+  "license": "ISC",
+  "author": "GermanMetzger",
+  "type": "module",
+  "main": "./src/server.js",
+  "scripts": {
+    "dev": "nodemon ./src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "mysql2": "^3.14.3",
+    "nodemon": "^3.1.10",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  }
+}
