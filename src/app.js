@@ -1,6 +1,5 @@
 import express from "express"
 import config from "./config.js";
-import indexRoutes from "./routes/index.routes.js"
 import usuarioRoutes from "./routes/usuario.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
@@ -24,7 +23,6 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-app.use(indexRoutes)
 app.use(usuarioRoutes)
 
 //configuracion
