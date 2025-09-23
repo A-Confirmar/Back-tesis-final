@@ -1,8 +1,17 @@
 import app from "./app.js";
 import config from "./config.js";
+import fs from 'fs';
+import https from 'https';
 
 
-app.listen(config.port, () => {
-  console.log(`Server corriendo en el puerto: ${app.get("port")} http://localhost:${app.get("port")}`);
+const options = {
+  key: fs.readFileSync('../../certificados/mykey.key'),
+  cert: fs.readFileSync('../../certificados/mycert.crt')
+};
+
+
+const server = https.createServer(options, app).listen(config.port,() => {
+  console.log('Servidor HTTPS escuchando en el puerto '+config.port);
 });
+
 
