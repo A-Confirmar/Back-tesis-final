@@ -1,8 +1,10 @@
 import express from "express"
 import config from "./config.js";
 import usuarioRoutes from "./routes/usuario.routes.js";
+import homeRoutes from "./routes/home.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
+import cookieParser from "cookie-parser";
 
 //swagger definition
 const swaggerOptions = {
@@ -12,6 +14,18 @@ const swaggerOptions = {
       title: "API Documentation",
       version: "1.0.0",
     },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT"
+        }
+      }
+    },
+    security: [
+      { bearerAuth: [] }
+    ]
   },
   apis: ["./routes/*.js", "./app.js"],
 };
@@ -20,10 +34,12 @@ const swaggerDocs = swaggerJSDoc(swaggerOptions);
 
 
 const app = express();  
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 app.use(usuarioRoutes)
+app.use(homeRoutes)
 
 //configuracion
 app.set("port", config.port);
