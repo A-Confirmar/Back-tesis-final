@@ -63,6 +63,7 @@ import { authMiddleware } from "../middleware/auth.js";
 router.get("/logIn", async (req, res) => {
   try {
     const { email, password } = req.body;
+
     const [rows] = await pool.query(`SELECT id, email, password FROM Usuario WHERE email = ?`, [email]);
     if (rows.length === 0) {
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
@@ -153,6 +154,7 @@ router.put("/register", async (req, res) => {
   //chequeo de que el email no esté ya en uso
   try {
     const { email, password, nombre, apellido, fecha_nacimiento, telefono } = req.body;
+		
     const [resultSelect] = await pool.query("SELECT * FROM Usuario WHERE email = ?", [email]);
     if (resultSelect.length > 0) {
       return res.status(400).json({ message: "El email ya está en uso", result: false }); //mail repetido

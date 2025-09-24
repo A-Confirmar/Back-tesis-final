@@ -5,6 +5,19 @@ import homeRoutes from "./routes/home.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import cookieParser from "cookie-parser";
+import { pool } from "./db.js"; // o como tengas tu archivo
+
+async function checkConnection() {
+  try {
+    // pedimos una conexión del pool
+    const connection = await pool.getConnection();
+    console.log("Conexión exitosa a la base de datos!");
+    connection.release(); // liberamos la conexión de vuelta al pool
+  } catch (err) {
+    console.error("Error conectando a la base de datos:", err.message);
+  }
+}
+
 
 //swagger definition
 const swaggerOptions = {
@@ -61,6 +74,8 @@ app.set("port", config.port);
  */
 app.get("/", (req,res)=>{
   res.send("¡Hola Mundo!");
+checkConnection();
+  
 }) ;
 
 
