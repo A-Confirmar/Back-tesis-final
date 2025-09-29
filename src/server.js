@@ -2,14 +2,6 @@ import app from "./app.js";
 import config from "./config.js";
 import fs from 'fs';
 import https from 'https';
-import cors from "cors";
-
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
 
 
 const options = {

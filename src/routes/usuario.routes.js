@@ -60,7 +60,7 @@ import { authMiddleware } from "../middleware/auth.js";
  *               message: "Algo salió mal: error"
  *               result: false
  */
-router.get("/logIn", async (req, res) => {
+router.post("/logIn", async (req, res) => {
   try {
     const { email, password } = req.body;
 

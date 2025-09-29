@@ -6,6 +6,9 @@ import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import cookieParser from "cookie-parser";
 import { pool } from "./db.js"; // o como tengas tu archivo
+import cors from "cors";
+
+
 
 async function checkConnection() {
   try {
@@ -47,12 +50,14 @@ const swaggerDocs = swaggerJSDoc(swaggerOptions);
 
 
 const app = express();  
+app.use(cors({ origin: "*" }));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 app.use(usuarioRoutes)
 app.use(homeRoutes)
+
 
 //configuracion
 app.set("port", config.port);
