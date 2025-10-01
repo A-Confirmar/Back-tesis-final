@@ -11,7 +11,7 @@ import { authMiddleware } from "../middleware/auth.js";
 /**
  * @swagger
  * /logIn:
- *   get:
+ *   post:
  *     tags:
  *       - CRUD Usuarios
  *     summary: "Logeo de usuario"
@@ -96,7 +96,7 @@ router.post("/logIn", async (req, res) => {
 /**
  * @swagger
  * /register:
- *   put:
+ *   post:
  *     tags:
  *       - CRUD Usuarios
  *     summary: "Crear un nuevo usuario"
@@ -184,7 +184,7 @@ router.put("/register", async (req, res) => {
 /**
  * @swagger
  * /update:
- *   post:
+ *   put:
  *     tags:
  *       - CRUD Usuarios
  *     summary: "Actualizar un usuario"
