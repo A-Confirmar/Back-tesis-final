@@ -150,7 +150,7 @@ router.post("/logIn", async (req, res) => {
  *               message: "Algo salió mal: error"
  *               result: false
  */
-router.put("/register", async (req, res) => {
+router.post("/register", async (req, res) => {
   //chequeo de que el email no esté ya en uso
   try {
     const { email, password, nombre, apellido, fecha_nacimiento, telefono } = req.body;
@@ -249,7 +249,7 @@ router.put("/register", async (req, res) => {
  *               message: "Algo salió mal: error"
  *               result: false
  */
-router.post("/update", authMiddleware, async (req, res) => {
+router.put("/update", authMiddleware, async (req, res) => {
   try {
     const { nombre, email, password, apellido, fecha_nacimiento, telefono } = req.body;
 
