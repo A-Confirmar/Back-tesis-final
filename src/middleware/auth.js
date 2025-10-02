@@ -15,7 +15,7 @@ export function authMiddleware(req, res, next) {
     return res.status(401).json({ message: "Token requerido", result: false });
   }
   try {
-    const decoded = jwt.verify(token, config.secreto);
+    const decoded = jwt.verify(token, config.SECRETO);
     req.user = decoded; // Datos del usuario disponibles en req.user
     next();
   } catch (err) {

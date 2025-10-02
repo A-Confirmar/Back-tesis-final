@@ -2,22 +2,24 @@ import dotenv from "dotenv"
 dotenv.config();
 
  const config = {
-  port: process.env.PORT,
-  secreto: process.env.JWT_SECRET,
-  salt: process.env.SALT_ROUNDS,
-  db: {
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
-       }
+  PORT: process.env.PORT,
+  SECRETO: process.env.JWT_SECRET,
+  SALT: process.env.SALT_ROUNDS,
+  GMAIL_USER: process.env.GMAIL_USER,
+  GMAIL_PASS: process.env.GMAIL_PASS,
+  DB: {
+    HOST: process.env.DB_HOST,
+    USER: process.env.DB_USER,
+    PASSWORD: process.env.DB_PASSWORD,
+    DATABASE: process.env.DB_NAME
+  }
   
-  //LOCAL
-    // db: {
-    // host:  "localhost",
-    // user:  "root",
-    // password:  "54213",
-    // database:  "MediTurnos"
+  // LOCAL
+    // DB: {
+    // HOST:  "localhost",
+    // USER:  "root",
+    // PASSWORD:  "54213",
+    // DATABASE:  "MediTurnos"
     //    }
 }
 

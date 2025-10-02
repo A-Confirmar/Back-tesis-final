@@ -2,24 +2,14 @@ import express from "express"
 import config from "./config.js";
 import usuarioRoutes from "./routes/usuario.routes.js";
 import homeRoutes from "./routes/home.routes.js";
+import mailroutes from "./routes/mail.routes.js";
+import disponibilidadRoutes from "./routes/Disponibilidad.routes.js";
+import turnosRoutes from "./routes/Turnos.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import cookieParser from "cookie-parser";
-import { pool } from "./db.js"; // o como tengas tu archivo
 import cors from "cors";
 
-
-
-async function checkConnection() {
-  try {
-    // pedimos una conexión del pool
-    const connection = await pool.getConnection();
-    console.log("Conexión exitosa a la base de datos!");
-    connection.release(); // liberamos la conexión de vuelta al pool
-  } catch (err) {
-    console.error("Error conectando a la base de datos:", err.message);
-  }
-}
 
 
 //swagger definition
@@ -57,31 +47,20 @@ app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 app.use(usuarioRoutes)
 app.use(homeRoutes)
+app.use(mailroutes)
+app.use(disponibilidadRoutes)
+app.use(turnosRoutes)
 
 
 //configuracion
-app.set("port", config.port);
+app.set("port", config.PORT);
 
 
 
 
-/**
- * @swagger
- * /:
- *   get:
- *     tags:
- *       - test
- *     summary: "Obtener un saludo"
- *     description: "Devuelve un saludo"
- *     responses:
- *       200:
- *         description: "Saludo exitoso"
- */
-app.get("/", (req,res)=>{
-  res.send("¡Hola Mundo!");
-checkConnection();
-  
-}) ;
+
+
+
 
 
 export default app;

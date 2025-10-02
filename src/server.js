@@ -10,8 +10,9 @@ const options = {
 };
 
 
-const server = https.createServer(options, app).listen(config.port,() => {
-  console.log('Servidor HTTPS escuchando en el puerto https://localhost:'+config.port);
+const server = https.createServer(options, app).listen(config.PORT,() => {
+  console.log('Servidor HTTPS escuchando en el puerto https://localhost:'+config.PORT);
+  console.log('Swagger https://localhost:'+config.PORT+"/api-docs");
 });
 
 
