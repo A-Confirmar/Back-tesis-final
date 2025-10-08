@@ -93,11 +93,14 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
 
     const [result] = await pool.query(sql, [userId]);
     if (result === undefined) {
+      console.log("Error al obtener el usuario: ", result);
       return res.status(500).json({ message: "Error al obtener el usuario", result: false });
     }
     if (result.length === 0) {
+      console.log("Usuario no encontrado con ID: ", userId);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
     }
+    console.log("Usuario obtenido: ", result[0]);
     res.status(200).json({ user: result[0], result: true });
   } catch (error) {
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
@@ -162,11 +165,13 @@ router.post("/logIn", async (req, res) => {
 
     const [rows] = await pool.query(`SELECT id, email, password FROM Usuario WHERE email = ?`, [email]);
     if (rows.length === 0) {
+      console.log("Usuario no encontrado con email: ", email);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
     }
 
     const isMatch = await bcrypt.compare(password, rows[0].password);
     if (!isMatch) {
+      console.log("Contraseña incorrecta para el usuario: ", email);
       return res.status(401).json({ message: "Credenciales inválidas", result: false }); // contraseña incorrecta
     }
 
@@ -184,8 +189,10 @@ router.post("/logIn", async (req, res) => {
     //   maxAge: 60 * 60 * 1000 // 1 hora en milisegundos
     // });
 
+    console.log("Usuario logueado correctamente: ", email);
     return res.status(200).json({ token: token, message: "Usuario logueado", result: true })
   } catch (error) {
+    console.error("Error en /logIn: ", error);
     res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
   }
 });
@@ -292,17 +299,21 @@ router.post("/register", async (req, res) => {
 
     const [resultSelect] = await connection.query("SELECT * FROM Usuario WHERE email = ?", [email]);
     if (resultSelect.length > 0) {
+      console.log("Email ya en uso: ", email);
       return res.status(400).json({ message: "El email ya está en uso", result: false }); //mail repetido
     }
     if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono) {
+      console.log("Faltan datos obligatorios para el registro");
       return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
     }
 
     if (password.length < 6) {
+      console.log("Contraseña débil, menos de 6 caracteres");
       return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false }); // contraseña débil
     }
 
     //hasheo de la contraseña y almacenamiento
+    console.log("Hasheando... 😶‍🌫️");
     const hashedPassword = await bcrypt.hashSync(password, Number(config.SALT));
 
     await connection.beginTransaction();
@@ -334,8 +345,10 @@ router.post("/register", async (req, res) => {
 
     await connection.commit();
     res.status(201).json({ message: "Usuario creado exitosamente", result: true }); //201 Created
+    console.log("Usuario registrado: ", email);
     enviarMailRegistro(email, nombre).catch(err => console.error("Error al enviar mail de registro: ", err));
   } catch (error) {
+    console.error("Error en al registrar: ", error);
     await connection.rollback();
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
   } finally {
@@ -416,13 +429,16 @@ router.put("/update", authMiddleware, async (req, res) => {
     const { nombre, email, password, apellido, fecha_nacimiento, telefono } = req.body;
 
     if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono) {
+      console.log("Faltan datos obligatorios para la actualización");
       return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
     }
 
     if (password.length < 6) {
+      console.log("Contraseña débil, menos de 6 caracteres para la actualización");
       return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false }); // contraseña débil
     }
 
+    console.log("Hasheando para actualización... 😶‍🌫️");
     const hashedPassword = await bcrypt.hashSync(password, Number(config.SALT));
 
     const token = jwt.sign({
@@ -436,10 +452,13 @@ router.put("/update", authMiddleware, async (req, res) => {
       [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, req.user.email]
     );
     if (result.affectedRows === 0) {
+      console.log("Usuario no encontrado para actualización: ", req.user.email);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
     }
+    console.log("Usuario actualizado: ", email);
     res.status(200).json({ nuevoToken: token, message: "Usuario actualizado correctamente", result: true });
   } catch (error) {
+    console.error("Error en /update: ", error);
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
   }
 });
@@ -487,8 +506,10 @@ router.put("/update", authMiddleware, async (req, res) => {
  */
 router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
   try {
+    console.log("Intentando eliminar usuario: ", req.user.email);
     const [result] = await pool.query("DELETE FROM Usuario WHERE email = ?", [req.user.email]);
     if (result.affectedRows === 0) {
+      console.log("Usuario no encontrado: ", req.user.email);
       return res
         .status(404)
         .json({ message: "Usuario no encontrado", result: false });
@@ -496,7 +517,9 @@ router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
     res
       .status(200)
       .json({ message: "Usuario eliminado correctamente", result: true });
+    console.log("Usuario eliminado: ", req.user.email);
   } catch (error) {
+    console.error("Error en /borrarUsuario: ", error);
     return res
       .status(500)
       .json({ message: "Algo salió mal: " + error.message, result: false });
@@ -575,16 +598,20 @@ router.get("/buscarProfesional", authMiddleware, async(req, res) => {
   const { leyenda } = req.body;
 
   if (!leyenda) {
+    console.log("Falta la leyenda del profesional en la búsqueda🧟‍♂️");
     return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
   }
 
   const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, p.especialidad, p.descripcion, p.calificacion_promedio FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%`, `%${leyenda}%`]);
   if (result.length === 0) {
+    console.log("No se encontraron profesionales para la leyenda: ", leyenda);
     return res.status(404).json({ message: "No se encontraron profesionales", result: false });
   }
 
+  console.log("Profesionales encontrados para la leyenda: ", leyenda);
   res.status(200).json({ message: "Profesionales encontrados", result: true, data: result });
   } catch (error) {
+    console.error("Error en /buscarProfesional: ", error);
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
   }
 });

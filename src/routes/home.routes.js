@@ -5,7 +5,6 @@ import { authMiddleware } from "../middleware/auth.js";
 
 
 /**
- * @swagger
  * /home:
  *   get:
  *     tags:
