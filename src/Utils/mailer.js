@@ -54,3 +54,33 @@ export async function enviarMailRegistro(to, nombre) {
     </div>${footer}`
     });
 }
+
+// Función para enviar mail de recordatorio de turno
+export async function enviarMailRecordatorioTurno(to, nombrePaciente, profesionalRows) {
+  return transporter.sendMail({
+      from: '"MediTurnos" <MediTurnos@gmail.com>',
+      to,
+      subject: `TURNO CON ${profesionalRows.nombre} ${profesionalRows.apellido} EN 1 HORA`, 
+      html: `${header}<div style="padding:32px 24px; font-family:'Segoe UI',Arial,sans-serif; color:#222;">
+      <div style="margin-bottom:16px; text-align:center; font-size:18px;">
+          <b>Hola ${nombrePaciente}, Tu turno comienza en 1 hora con el profesional ${profesionalRows.nombre} ${profesionalRows.apellido}.</b>
+      </div>
+  </div>${footer}`
+  });
+}
+
+
+// Función para enviar mail de confirmacion de turno
+export async function enviarMailConfirmacionTurno(to, nombrePaciente, profesionalRows, hora_inicio, fecha) {
+  return transporter.sendMail({
+      from: '"MediTurnos" <MediTurnos@gmail.com>',
+      to,
+      subject: `CONFIRMACIÓN DE TURNO CON ${profesionalRows.nombre} ${profesionalRows.apellido}`, 
+      html: `${header}<div style="padding:32px 24px; font-family:'Segoe UI',Arial,sans-serif; color:#222;">
+      <div style="margin-bottom:16px; text-align:center; font-size:18px;">
+          <b>Hola ${nombrePaciente}, Tu turno ha sido confirmado con el profesional ${profesionalRows.nombre} ${profesionalRows.apellido}.</b> <br/>
+          <b>Su turno es el dia ${fecha} a las ${hora_inicio}.</b>
+      </div>
+  </div>${footer}`
+  });
+}

@@ -5,8 +5,74 @@ import pool from "../db.js";
 
 import { authMiddleware } from "../middleware/auth.js";
 
+/**
+ * @swagger
+ * /obtenerDisponibilidadProfesional:
+ *   get:
+ *     tags:
+ *       - CRUD disponibilidad profesional
+ *     summary: "Obtener disponibilidad profesional (requiere autenticación)"
+ *     description: "Obtiene la disponibilidad del profesional autenticado."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Token JWT de autenticación
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     responses:
+ *       200:
+ *         description: "Disponibilidad encontrada"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Disponibilidad encontrada"
+ *               disponibilidad:
+ *                 - ID: 1
+ *                   nombre: "Juan Pérez"
+ *                   dia_semana: "lunes"
+ *                   hora_inicio: "08:00:00"
+ *                   hora_fin: "12:00:00"
+ *               result: true
+ *       404:
+ *         description: "No se encontró disponibilidad para este profesional"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "No se encontró disponibilidad para este profesional"
+ *               result: false
+ *       500:
+ *         description: "Error al obtener disponibilidad"
+ *         content:
+ *           application/json:
+ *             example:
+ *               error: "Error al obtener disponibilidad"
+ *               result: false
+ */
+router.get("/obtenerDisponibilidadProfesional", authMiddleware, async (req, res) => {
+    try {
+        logToPage(`Buscando disponibilidad del profesional: ${req.user.email}`);
+        const [rows] = await pool.query("SELECT d.ID, u.nombre + u.apellido AS nombre, d.dia_semana, d.hora_inicio, d.hora_fin FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE d.profesional_ID = ?", [req.user.id]);
 
+        if (rows.length === 0) {
+            logErrorToPage("No se encontró disponibilidad para el profesional:", req.user.email);
+            return res.status(404).json({ message: "No se encontró disponibilidad para este profesional", result: false });
+        }
 
+        if (rows.length > 0) {
+            logToPage(`Disponibilidad encontrada para el profesional: ${req.user.email}`);
+            return res.status(200).json({ message: "Disponibilidad encontrada", disponibilidad: rows, result: true });
+        }
+
+    } catch (error) {
+        logErrorToPage("Error al obtener disponibilidad:", error);
+        res.status(500).json({ error: "Error al obtener disponibilidad" });
+    }
+});
 
 /**
  * @swagger
@@ -158,6 +224,7 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
         // };
 
         if (!horarios) {
+            logErrorToPage("No se proporcionaron horarios" + horarios);
             return res.status(400).json({ message: "Debe enviar horarios", result: false });
         }
 
@@ -169,6 +236,7 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
         }
 
         if (values.length === 0) {
+            logErrorToPage("No se proporcionaron horarios válidos" + values);
             return res.status(400).json({ message: "No se proporcionaron horarios válidos", result: false });
         }
 
@@ -193,11 +261,12 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
         }
 
         connection.commit();
+        logToPage(`Disponibilidad actualizada para el profesional: ${req.user.email}`);
         res.status(201).json({ message: "Disponibilidad actualizada", result: true });
 
     } catch (error) {
         if (connection) await connection.rollback();
-        console.error("Error al actualizar disponibilidad:", error);
+        logErrorToPage("Error al actualizar disponibilidad:", error);
         res.status(500).json({ message: "Error interno", error, result: false });
     } finally {
         if (connection) connection.release();
