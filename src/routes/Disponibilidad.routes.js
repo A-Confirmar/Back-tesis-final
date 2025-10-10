@@ -55,23 +55,21 @@ import { authMiddleware } from "../middleware/auth.js";
  */
 router.get("/obtenerDisponibilidadProfesional", authMiddleware, async (req, res) => {
     try {
-        console.log("Buscando disponibilidad del profesional:", req.user.email);
+        logToPage(`Buscando disponibilidad del profesional: ${req.user.email}`);
         const [rows] = await pool.query("SELECT d.ID, u.nombre + u.apellido AS nombre, d.dia_semana, d.hora_inicio, d.hora_fin FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE d.profesional_ID = ?", [req.user.id]);
-        console.log(rows);
 
         if (rows.length === 0) {
-            console.log("No se encontró disponibilidad para el profesional:", req.user.email);
+            logErrorToPage("No se encontró disponibilidad para el profesional:", req.user.email);
             return res.status(404).json({ message: "No se encontró disponibilidad para este profesional", result: false });
         }
 
         if (rows.length > 0) {
-            console.log("Disponibilidad encontrada para el profesional:", req.user.email);
-            console.log(rows);
+            logToPage(`Disponibilidad encontrada para el profesional: ${req.user.email}`);
             return res.status(200).json({ message: "Disponibilidad encontrada", disponibilidad: rows, result: true });
         }
 
     } catch (error) {
-        console.error("Error al obtener disponibilidad:", error);
+        logErrorToPage("Error al obtener disponibilidad:", error);
         res.status(500).json({ error: "Error al obtener disponibilidad" });
     }
 });
@@ -226,6 +224,7 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
         // };
 
         if (!horarios) {
+            logErrorToPage("No se proporcionaron horarios" + horarios);
             return res.status(400).json({ message: "Debe enviar horarios", result: false });
         }
 
@@ -237,6 +236,7 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
         }
 
         if (values.length === 0) {
+            logErrorToPage("No se proporcionaron horarios válidos" + values);
             return res.status(400).json({ message: "No se proporcionaron horarios válidos", result: false });
         }
 
@@ -261,11 +261,12 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
         }
 
         connection.commit();
+        logToPage(`Disponibilidad actualizada para el profesional: ${req.user.email}`);
         res.status(201).json({ message: "Disponibilidad actualizada", result: true });
 
     } catch (error) {
         if (connection) await connection.rollback();
-        console.error("Error al actualizar disponibilidad:", error);
+        logErrorToPage("Error al actualizar disponibilidad:", error);
         res.status(500).json({ message: "Error interno", error, result: false });
     } finally {
         if (connection) connection.release();

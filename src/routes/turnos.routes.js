@@ -4,6 +4,7 @@ import pool from "../db.js";
 import dayjs from "dayjs";
 import { recordatorioDeTurno, cancelarRecordatorioDeTurno } from "../Utils/recordatorios.js";
 import { enviarMailConfirmacionTurno } from "../Utils/mailer.js";
+import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 
 import { authMiddleware } from "../middleware/auth.js";
 
@@ -57,10 +58,18 @@ function obtenerDiaSemana(fechaStr) {
  *             example:
  *               message: "El usuario no tiene turnos"
  *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error al buscar turno"
+ *               result: false
  */
 router.get("/buscarTurno", authMiddleware, async (req, res) => {
     try {
 
+        logToPage(`Buscando turnos para el usuario email: ${req.user.email}`);
         const [turnos] = await pool.query(`
             SELECT 
                 t.ID AS turnoId,
@@ -81,19 +90,21 @@ router.get("/buscarTurno", authMiddleware, async (req, res) => {
 
 
         if (turnos.length === 0) {
+            logToPage(`El usuario con email ${req.user.email} no tiene turnos.`);
             return res.status(404).json({
                 message: "El usuario no tiene turnos",
                 result: false
             });
         }
 
+        logToPage(`Turnos encontrados para el usuario con email ${req.user.email}: ${turnos.length} turnos.`);
         res.json({
             message: "Turnos encontrados",
             result: true,
             turnos: turnos
         });
     } catch (error) {
-        console.error("Error al buscar turno:", error);
+        logErrorToPage("Error al buscar turno:", error);
         res.status(500).json({
             message: "Error al buscar turno",
             result: false
@@ -188,6 +199,7 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
         const diaSemana = obtenerDiaSemana(fecha);
 
         if (!emailProfesional || !fecha || !hora_inicio || !hora_fin || !estado || !tipo)
+            logErrorToPage("Faltan datos obligatorios para crear el turno");
             return res.status(400).json({
                 message: "Faltan datos obligatorios",
                 result: false
@@ -201,6 +213,7 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
         let idProfesional;
         let turnoExistente;
         if (result.length > 0) {
+            logToPage(`El profesional con email ${emailProfesional} tiene disponibilidad el ${diaSemana} de ${hora_inicio} a ${hora_fin}`);
             idProfesional = result[0].profesional_ID;
             // Verificar si ya existe un turno en el mismo horario
             [turnoExistente] = await pool.query(
@@ -208,6 +221,7 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
                 [emailProfesional, fecha, hora_inicio, hora_fin]
             );
         } else {
+            logErrorToPage(`El profesional con email ${emailProfesional} no tiene disponibilidad el ${diaSemana} de ${hora_inicio} a ${hora_fin}`);
             return res.status(400).json({
                 message: "El profesional no tiene disponibilidad en ese horario",
                 result: false
@@ -215,26 +229,31 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
         }
 
         if (turnoExistente.length > 0) {
+            logErrorToPage(`Ya existe un turno para el profesional con email ${emailProfesional} el ${fecha} de ${hora_inicio} a ${hora_fin}`);
             return res.status(400).json({
                 message: "Ya existe un turno en ese horario",
                 result: false
             });
         }
         // Insertar el nuevo turno
+        logToPage(`Creando nuevo turno para el usuario ${user.email} con el profesional ${emailProfesional} el ${fecha} de ${hora_inicio} a ${hora_fin}`);
         const [reserva] = await pool.query(
             "INSERT INTO Turno (paciente_ID, profesional_ID, fecha, hora_inicio, hora_fin, estado, tipo) VALUES (?,?, ?, ?, ?, ?, ?)",
             [user.id, idProfesional, fecha, hora_inicio, hora_fin, estado, tipo]
         );
         if (reserva.affectedRows === 1) {
+            logToPage(`Turno creado exitosamente con ID ${reserva.insertId}`);
 
             // Obtener el nombre del paciente y del profesional
             const [pacienteRows] = await pool.query("SELECT nombre FROM Usuario WHERE email = ?", [user.email]);
             const [profesionalRows] = await pool.query("SELECT nombre, apellido FROM Usuario WHERE id = ?", [idProfesional]);
 
             // Programar el recordatorio
+            logToPage(`Programando recordatorio para el turno ID ${reserva.insertId}`);
             recordatorioDeTurno(pacienteRows[0].nombre, user.email, profesionalRows[0], fecha, hora_inicio, reserva.insertId);
 
             // Enviar mail de confirmación
+            logToPage(`Enviando mail de confirmación al paciente ${user.email}`);
             enviarMailConfirmacionTurno(user.email, pacienteRows[0].nombre, profesionalRows[0], hora_inicio, fecha);
             res.status(201).json({
                 message: "Turno creado exitosamente",
@@ -243,7 +262,7 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
         }
 
     } catch (error) {
-        console.error("Error al crear turno:", error);
+        logErrorToPage("Error al crear turno:", error);
         res.status(500).json({
             message: "Error al crear turno: " + error.message,
             result: false
@@ -290,6 +309,7 @@ router.delete("/eliminarTurno", authMiddleware, async (req, res) => {
         const [check] = await pool.query("SELECT ID FROM Turno WHERE ID = ? AND paciente_ID = ?", [turnoId, user.id]);
 
         if (check.length === 0) {
+            logErrorToPage(`El turno con ID ${turnoId} no existe o no pertenece al usuario con email ${user.email}`);
             return res.status(404).json({
                 message: "Turno no encontrado",
                 result: false
@@ -299,25 +319,27 @@ router.delete("/eliminarTurno", authMiddleware, async (req, res) => {
         // Eliminar el turno de la base de datos
         const [result] = await pool.query("DELETE FROM Turno WHERE id = ? AND paciente_ID = ?", [turnoId, user.id]);
         if (result.affectedRows === 1) {
+            logToPage(`Turno con ID ${turnoId} eliminado exitosamente para el usuario con email ${user.email}`);
             // Cancelar el recordatorio
             const recordatorio = cancelarRecordatorioDeTurno(turnoId);
             if (recordatorio) {
-                console.log("Recordatorio cancelado exitosamente");
+                logToPage("Recordatorio cancelado exitosamente");
             } else {
-                console.log("No se pudo cancelar el recordatorio o no existía");
+                logErrorToPage("No se pudo cancelar el recordatorio o no existía");
             }
             res.status(200).json({
                 message: "Turno eliminado exitosamente",
                 result: true
             });
         } else {
+            logErrorToPage(`No se pudo encontrar el turno con ID ${turnoId} para el usuario con email ${user.email}`);
             res.status(404).json({
                 message: "Turno no encontrado",
                 result: false
             });
         }
     } catch (error) {
-        console.error("Error al eliminar turno:", error);
+        logErrorToPage("Error al eliminar turno:", error);
         res.status(500).json({
             message: "Error al eliminar turno: " + error.message,
             result: false

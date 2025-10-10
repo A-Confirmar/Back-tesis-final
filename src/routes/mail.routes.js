@@ -1,6 +1,7 @@
 import { Router } from "express";
 const router = Router();
 import { enviarMailRecuperar } from "../Utils/mailer.js";
+import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 
 
 /**
@@ -46,10 +47,11 @@ router.post("/enviarMailRecuperarClave", (req, res) => {
     const { email } = req.body;
     enviarMailRecuperar(email)
       .then(() => {
+        logToPage(`Correo de recuperación enviado a ${email}`);
         res.status(200).json({ message: "Correo de recuperación enviado", result: true });
       });
   } catch (error) {
-      console.error("Error al enviar correo:");
+      logErrorToPage("Error al enviar correo:"+ error);
       res.status(500).json({ message: "Error al enviar correo", error, result: false});
   }
 });
