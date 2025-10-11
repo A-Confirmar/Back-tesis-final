@@ -77,12 +77,12 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
     u.nombre,
     u.apellido,
     u.telefono,
-    u.localidad
+    u.localidad,
     DATE_FORMAT(u.fecha_nacimiento, '%d-%m-%Y') AS fecha_nacimiento,
     p.especialidad,
     p.descripcion,
     p.calificacion_promedio,
-    p.direccion
+    p.direccion,
     CASE
     WHEN p.ID IS NOT NULL THEN 'profesional'
     WHEN pa.ID IS NOT NULL THEN 'paciente'
