@@ -688,15 +688,9 @@ router.get("/buscarProfesional", authMiddleware, async(req, res) => {
  *               message: "Algo salió mal: error"
  *               result: false
  */
-router.post("/cambiarClave", async (req, res) => {
+router.post("/cambiarClave", authMiddleware, async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
-
-    // Validar que se envió el token
-    if (!token) {
-      logErrorToPage("Token no proporcionado en /cambiarClave");
-      return res.status(400).json({ message: "Token requerido", result: false });
-    }
+    const { newPassword } = req.body;
 
     // Validar que se envió la nueva contraseña
     if (!newPassword) {
@@ -710,27 +704,18 @@ router.post("/cambiarClave", async (req, res) => {
       return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false });
     }
 
-    // Verificar el token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, config.SECRETO);
-    } catch (error) {
-      logErrorToPage("Token inválido o expirado en /cambiarClave: ", error.message);
-      return res.status(401).json({ message: "Token inválido o expirado", result: false });
-    }
-
     // Validar que el token es para recuperación de contraseña
-    if (decoded.purpose !== 'password_reset') {
+    if (req.user.purpose !== 'password_reset') {
       logErrorToPage("Token no es de recuperación de contraseña");
       return res.status(401).json({ message: "Token inválido", result: false });
     }
 
-    const email = decoded.email;
+    const email = req.user.email;
 
     // Verificar que el usuario existe
     const [rows] = await pool.query("SELECT id FROM Usuario WHERE email = ?", [email]);
     if (rows.length === 0) {
-      logErrorToPage("Usuario no encontrado con email: ", email);
+      logErrorToPage("Usuario no encontrado con email: "+ email);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
     }
 
