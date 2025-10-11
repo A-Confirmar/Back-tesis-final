@@ -7,7 +7,7 @@ dotenv.config();
   SALT: process.env.SALT_ROUNDS,
   GMAIL_USER: process.env.GMAIL_USER,
   GMAIL_PASS: process.env.GMAIL_PASS,
-  FRONTEND_URL: "https://medi-turnos-front.vercel.app/cambiarTurno",
+  FRONTEND_URL: "https://medi-turnos-front.vercel.app/cambiarClave",
   DB: {
     HOST: process.env.DB_HOST,
     USER: process.env.DB_USER,
