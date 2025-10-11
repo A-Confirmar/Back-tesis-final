@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import config from '../config.js';
+import jwt from 'jsonwebtoken';
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -27,13 +28,23 @@ const footer = `
 
 // Función para enviar mail de recuperación
 export async function enviarMailRecuperar(to) {
+    // Generar token de recuperación con expiración de 1 hora
+    const resetToken = jwt.sign(
+        { email: to, purpose: 'password_reset' },
+        config.SECRETO,
+        { expiresIn: '1h' }
+    );
+
+    const resetUrl = `${config.FRONTEND_URL}/cambiarClave?token=${resetToken}`;
+    
     return transporter.sendMail({
         from: '"MediTurnos" <MediTurnos@gmail.com>',
         to,
         subject: "Recupera tu contraseña",
         html: `${header}<div style="padding:32px 24px; font-family:'Segoe UI',Arial,sans-serif; color:#222;">
     <div style="margin-bottom:16px; text-align:center; font-size:18px;">
-        <p>Haz click aquí para recuperar tu contraseña: <a href="https://mediturnos-eta.vercel.app/cambiarClave">Recupera contraseña</a></p>
+        <p>Haz click aquí para recuperar tu contraseña: <a href="${resetUrl}" style="background:#1976d2; color:#fff; padding:12px 24px; text-decoration:none; border-radius:4px; display:inline-block; margin-top:10px;">Recuperar contraseña</a></p>
+        <p style="color:#888; font-size:14px; margin-top:20px;">Este enlace expirará en 1 hora.</p>
     </div>
   </div>${footer}`
     });

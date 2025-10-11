@@ -617,4 +617,122 @@ router.get("/buscarProfesional", authMiddleware, async(req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /cambiarClave:
+ *   post:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Cambiar contraseña con token de recuperación"
+ *     description: "Permite cambiar la contraseña de un usuario usando el token enviado por correo."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - newPassword
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 description: "Token de recuperación enviado por correo"
+ *               newPassword:
+ *                 type: string
+ *                 example: "nuevaPassword123"
+ *                 description: "Nueva contraseña (mínimo 6 caracteres)"
+ *     responses:
+ *       200:
+ *         description: "Contraseña actualizada exitosamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Contraseña actualizada exitosamente"
+ *               result: true
+ *       400:
+ *         description: "Token o contraseña inválidos"
+ *         content:
+ *           application/json:
+ *             examples:
+ *               tokenFaltante:
+ *                 summary: "Token faltante"
+ *                 value:
+ *                   message: "Token requerido"
+ *                   result: false
+ *               passwordDebil:
+ *                 summary: "Contraseña débil"
+ *                 value:
+ *                   message: "La contraseña debe tener al menos 6 caracteres"
+ *                   result: false
+ *       401:
+ *         description: "Token inválido o expirado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Token inválido o expirado"
+ *               result: false
+ *       404:
+ *         description: "Usuario no encontrado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Usuario no encontrado"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Algo salió mal: error"
+ *               result: false
+ */
+router.post("/cambiarClave", authMiddleware, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+
+    // Validar que se envió la nueva contraseña
+    if (!newPassword) {
+      logErrorToPage("Nueva contraseña no proporcionada en /cambiarClave");
+      return res.status(400).json({ message: "Nueva contraseña requerida", result: false });
+    }
+
+    // Validar longitud de contraseña
+    if (newPassword.length < 6) {
+      logErrorToPage("Contraseña débil en /cambiarClave");
+      return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false });
+    }
+
+    // Validar que el token es para recuperación de contraseña
+    if (req.user.purpose !== 'password_reset') {
+      logErrorToPage("Token no es de recuperación de contraseña");
+      return res.status(401).json({ message: "Token inválido", result: false });
+    }
+
+    const email = req.user.email;
+
+    // Verificar que el usuario existe
+    const [rows] = await pool.query("SELECT id FROM Usuario WHERE email = ?", [email]);
+    if (rows.length === 0) {
+      logErrorToPage("Usuario no encontrado con email: "+ email);
+      return res.status(404).json({ message: "Usuario no encontrado", result: false });
+    }
+
+    // Hashear la nueva contraseña
+    logToPage("Hasheando nueva contraseña para: ", email);
+    const hashedPassword = await bcrypt.hashSync(newPassword, Number(config.SALT));
+
+    // Actualizar la contraseña
+    await pool.query("UPDATE Usuario SET password = ? WHERE email = ?", [hashedPassword, email]);
+
+    logToPage("Contraseña actualizada exitosamente para: ", email);
+    return res.status(200).json({ message: "Contraseña actualizada exitosamente", result: true });
+
+  } catch (error) {
+    logErrorToPage("Error en /cambiarClave: ", error);
+    return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
+  }
+});
+
 export default router;

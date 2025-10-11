@@ -10,8 +10,8 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
  *   post:
  *     tags:
  *       - Mails
- *     summary: "Enviar correo de recuperación de contraseña al usuario que redirija a la página de cambio de contraseña de VERCEL: https://mediturnos-eta.vercel.app/cambiarClave"
- *     description: "Envía un correo de recuperación de contraseña al usuario."
+ *     summary: "Enviar correo de recuperación de contraseña con token único"
+ *     description: "Envía un correo de recuperación de contraseña al usuario con un enlace que contiene un token JWT de un solo uso válido por 1 hora."
  *     requestBody:
  *       required: true
  *       content:
