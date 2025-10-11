@@ -35,7 +35,7 @@ export async function enviarMailRecuperar(to) {
         { expiresIn: '1h' }
     );
 
-    const resetUrl = `${config.FRONTEND_URL}/cambiarClave?token=${resetToken}`;
+    const resetUrl = `${config.FRONTEND_URL}?token=${resetToken}`;
     
     return transporter.sendMail({
         from: '"MediTurnos" <MediTurnos@gmail.com>',

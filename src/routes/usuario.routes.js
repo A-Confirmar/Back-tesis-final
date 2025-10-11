@@ -38,10 +38,12 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
  *                 nombre: "Juan"
  *                 apellido: "Pérez"
  *                 telefono: "2995555555"
+ *                 localidad: "Aregentina"
  *                 fecha_nacimiento: "01-01-2000"
  *                 especialidad: "Cardiología"
  *                 descripcion: "Médico cardiólogo"
  *                 calificacion_promedio: 4.5
+ *                 direccion: "Rio negro 2170"
  *                 rol: "profesional"
  *               result: true
  *       401:
@@ -75,10 +77,12 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
     u.nombre,
     u.apellido,
     u.telefono,
+    u.localidad
     DATE_FORMAT(u.fecha_nacimiento, '%d-%m-%Y') AS fecha_nacimiento,
     p.especialidad,
     p.descripcion,
     p.calificacion_promedio,
+    p.direccion
     CASE
     WHEN p.ID IS NOT NULL THEN 'profesional'
     WHEN pa.ID IS NOT NULL THEN 'paciente'
@@ -226,6 +230,8 @@ router.post("/logIn", async (req, res) => {
  *                 format: date
  *               telefono:
  *                 type: integer
+ *               localidad:
+ *                 type: string
  *               rol:
  *                 type: string
  *                 enum: [profesional, paciente, administrador]
@@ -235,6 +241,8 @@ router.post("/logIn", async (req, res) => {
  *                 type: string
  *               calificacionPromedio:
  *                 type: number
+ *               direccion:
+ *                 type: string
  *           examples:
  *             profesional:
  *               summary: "Ejemplo de registro de profesional"
@@ -249,6 +257,7 @@ router.post("/logIn", async (req, res) => {
  *                 especialidad: "Cardiología"
  *                 descripcion: "Médica cardióloga con 10 años de experiencia"
  *                 calificacionPromedio: 4.5
+ *                 direccion: "Rio Negro 2170"
  *             paciente:
  *               summary: "Ejemplo de registro de paciente"
  *               value:
@@ -259,6 +268,7 @@ router.post("/logIn", async (req, res) => {
  *                 fecha_nacimiento: "1995-09-10"
  *                 telefono: 2995552222
  *                 rol: "paciente"
+ *                 localidad: "Argentina"
  *             administrador:
  *               summary: "Ejemplo de registro de administrador"
  *               value:
@@ -269,6 +279,7 @@ router.post("/logIn", async (req, res) => {
  *                 fecha_nacimiento: "1990-03-15"
  *                 telefono: 2995553333
  *                 rol: "administrador"
+ *                 localidad: "Argentina"
  *     responses:
  *       201:
  *         description: "Usuario creado exitosamente"
@@ -296,15 +307,16 @@ router.post("/register", async (req, res) => {
   const connection = await pool.getConnection();
   //chequeo de que el email no esté ya en uso
   try {
-    const { email, password, nombre, apellido, fecha_nacimiento, telefono, rol, especialidad, descripcion, calificacionPromedio } = req.body;
+    const { email, password, nombre, apellido, fecha_nacimiento, telefono, rol, localidad, especialidad, descripcion, calificacionPromedio, direccion } = req.body;
 
     const [resultSelect] = await connection.query("SELECT * FROM Usuario WHERE email = ?", [email]);
     if (resultSelect.length > 0) {
       logErrorToPage("Email ya en uso: "+ email);
       return res.status(400).json({ message: "El email ya está en uso", result: false }); //mail repetido
     }
-    if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono) {
-      logErrorToPage("Faltan datos obligatorios para el registro");
+    
+    if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono || !localidad) {
+      logErrorToPage("Faltan datos obligatorios para el registro: " + JSON.stringify(req.body));
       return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
     }
 
@@ -320,15 +332,15 @@ router.post("/register", async (req, res) => {
     await connection.beginTransaction();
 
     const [result] = await connection.query(
-      "INSERT INTO Usuario (nombre, email, password, apellido, fecha_nacimiento, telefono) VALUES (?, ?, ?, ?, ?, ?)", [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono] // almaceno la contraseña hasheada
+      "INSERT INTO Usuario (nombre, email, password, apellido, fecha_nacimiento, telefono, localidad) VALUES (?, ?, ?, ?, ?, ?, ?)", [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad] // almaceno la contraseña hasheada
     );
 
     const usuarioId = result.insertId;
 
     if (rol === "profesional") {
       await connection.query(
-        "INSERT INTO Profesional (ID, especialidad, descripcion, calificacion_promedio) VALUES (?, ?, ?, ?)",
-        [usuarioId, especialidad, descripcion, calificacionPromedio || 0]
+        "INSERT INTO Profesional (ID, especialidad, descripcion, calificacion_promedio, direccion) VALUES (?, ?, ?, ?, ?)",
+        [usuarioId, especialidad, descripcion, calificacionPromedio || 0, direccion]
       );
     } else if (rol === "paciente") {
       await connection.query(
@@ -349,7 +361,7 @@ router.post("/register", async (req, res) => {
     logToPage("Usuario registrado: "+ email);
     enviarMailRegistro(email, nombre).catch(err => logErrorToPage("Error al enviar mail de registro: ", err));
   } catch (error) {
-    logErrorToPage("Error en al registrar: ", error);
+    logErrorToPage("Error en al registrar: " + error);
     await connection.rollback();
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
   } finally {
@@ -427,10 +439,10 @@ router.post("/register", async (req, res) => {
  */
 router.put("/update", authMiddleware, async (req, res) => {
   try {
-    const { nombre, email, password, apellido, fecha_nacimiento, telefono } = req.body;
+    const { nombre, email, password, apellido, fecha_nacimiento, telefono, localidad } = req.body;
 
-    if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono) {
-      logErrorToPage("Faltan datos obligatorios para la actualización", req.body);
+    if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono || !localidad) {
+      logErrorToPage("Faltan datos obligatorios para la actualización: " + JSON.stringify(req.body));
       return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
     }
 
@@ -449,8 +461,8 @@ router.put("/update", authMiddleware, async (req, res) => {
     }, config.SECRETO, { expiresIn: "1h" });
 
     const [result] = await pool.query(
-      "UPDATE Usuario SET nombre = ?, email = ?, password = ?, apellido = ?, fecha_nacimiento = ?, telefono = ? WHERE email = ?",
-      [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, req.user.email]
+      "UPDATE Usuario SET nombre = ?, email = ?, password = ?, apellido = ?, fecha_nacimiento = ?, telefono = ?, localidad = ? WHERE email = ?",
+      [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad, req.user.email]
     );
     if (result.affectedRows === 0) {
       logErrorToPage("Usuario no encontrado para actualización: ", req.user.email);
@@ -559,17 +571,23 @@ router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
  *               data: [
  *                 {
  *                   "nombre": "German",
- *                   "ID": 11,
+ *                   "apellido": "Lopez",
+ *                   "email": "german.lopez@example.com",
+ *                   "localidad": "Argentina",
  *                   "especialidad": "psicologo",
  *                   "descripcion": "Soy un re psicologo",
- *                   "calificacion_promedio": "7.00"
+ *                   "calificacion_promedio": "7.00",
+ *                   "direccion": "Calle Falsa 123"
  *                 },
  *                 {
  *                   "nombre": "Roma",
- *                   "ID": 12,
+ *                   "apellido": "Gonzalez",
+ *                   "email": "roma.gonzalez@example.com",
+ *                   "localidad": "Argentina",
  *                   "especialidad": "Medica",
  *                   "descripcion": "Soy una re medica",
- *                   "calificacion_promedio": "9.00"
+ *                   "calificacion_promedio": "9.00",
+ *                   "direccion": "Avenida Siempre Viva 742"
  *                 }
  *               ]
  *       404:
@@ -603,7 +621,7 @@ router.get("/buscarProfesional", authMiddleware, async(req, res) => {
     return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
   }
 
-  const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, p.especialidad, p.descripcion, p.calificacion_promedio FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%`, `%${leyenda}%`]);
+  const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%`, `%${leyenda}%`]);
   if (result.length === 0) {
     logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
     return res.status(404).json({ message: "No se encontraron profesionales", result: false });
