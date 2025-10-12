@@ -12,21 +12,24 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 /**
  * @swagger
  * /obtenerUsuario:
- *   post:
+ *   get:
  *     tags:
  *       - CRUD Usuarios
  *     summary: "Obtener datos públicos del usuario autenticado"
- *     description: "Devuelve los datos públicos del usuario autenticado. Requiere token en el body."
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     description: "Devuelve los datos públicos del usuario autenticado. Requiere token en el headers."
+ *     parameters:
+ *       - name: leyenda
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "psicologo"
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *     responses:
  *       200:
  *         description: "Datos del usuario obtenidos correctamente"
@@ -544,22 +547,22 @@ router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
  * /buscarProfesional:
  *   get:
  *     tags:
- *       - Profesionales
+ *       - CRUD Usuarios
  *     summary: "Buscar profesionales"
- *     description: "Busca profesionales por nombre o especialidad."
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *               leyenda:
- *                 type: string
- *                 example: "psicologo"
+ *     description: "Busca profesionales por nombre o especialidad. Si no se pone nada en leyenda, trae todos los profesionales."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       - name: leyenda
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: "psicologo"
  *     responses:
  *       200:
  *         description: "Profesionales encontrados"
@@ -568,28 +571,23 @@ router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
  *             example:
  *               message: "Profesionales encontrados"
  *               result: true
- *               data: [
- *                 {
- *                   "nombre": "German",
- *                   "apellido": "Lopez",
- *                   "email": "german.lopez@example.com",
- *                   "localidad": "Argentina",
- *                   "especialidad": "psicologo",
- *                   "descripcion": "Soy un re psicologo",
- *                   "calificacion_promedio": "7.00",
- *                   "direccion": "Calle Falsa 123"
- *                 },
- *                 {
- *                   "nombre": "Roma",
- *                   "apellido": "Gonzalez",
- *                   "email": "roma.gonzalez@example.com",
- *                   "localidad": "Argentina",
- *                   "especialidad": "Medica",
- *                   "descripcion": "Soy una re medica",
- *                   "calificacion_promedio": "9.00",
- *                   "direccion": "Avenida Siempre Viva 742"
- *                 }
- *               ]
+ *               data:
+ *                 - nombre: "German"
+ *                   apellido: "Lopez"
+ *                   email: "german.lopez@example.com"
+ *                   localidad: "Argentina"
+ *                   especialidad: "psicologo"
+ *                   descripcion: "Soy un re psicologo"
+ *                   calificacion_promedio: "7.00"
+ *                   direccion: "Calle Falsa 123"
+ *                 - nombre: "Roma"
+ *                   apellido: "Gonzalez"
+ *                   email: "roma.gonzalez@example.com"
+ *                   localidad: "Argentina"
+ *                   especialidad: "Medica"
+ *                   descripcion: "Soy una re medica"
+ *                   calificacion_promedio: "9.00"
+ *                   direccion: "Avenida Siempre Viva 742"
  *       404:
  *         description: "No se encontraron profesionales"
  *         content:
@@ -614,14 +612,14 @@ router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
  */
 router.get("/buscarProfesional", authMiddleware, async(req, res) => {
   try{
-  const { leyenda } = req.body;
+  const { leyenda } = req.query;
 
-  if (!leyenda) {
-    logErrorToPage("Falta la leyenda del profesional en la búsqueda🧟‍♂️");
-    return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
-  }
+  // if (!leyenda) {
+  //   logErrorToPage("Falta la leyenda del profesional en la búsqueda🧟‍♂️");
+  //   return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
+  // }
 
-  const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%`, `%${leyenda}%`]);
+  const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%`+" || *", `%${leyenda}%`]);
   if (result.length === 0) {
     logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
     return res.status(404).json({ message: "No se encontraron profesionales", result: false });

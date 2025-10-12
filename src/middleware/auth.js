@@ -10,6 +10,8 @@ export function authMiddleware(req, res, next) {
     token = authHeader.split(" ")[1];
   } else if (req.body && req.body.token) {
     token = req.body.token;
+  } else if (req.query && req.query.token) {
+    token = req.query.token;
   }
   if (!token) {
     return res.status(401).json({ message: "Token requerido", result: false });

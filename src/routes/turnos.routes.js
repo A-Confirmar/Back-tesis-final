@@ -25,16 +25,13 @@ function obtenerDiaSemana(fechaStr) {
  *     description: "Busca todos los turnos existentes para el usuario autenticado."
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     parameters:
+ *       - name: token
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *     responses:
  *       200:
  *         description: "Turno encontrado"
@@ -131,6 +128,101 @@ router.get("/buscarTurno", authMiddleware, async (req, res) => {
  *             required:
  *               - token
  *               - emailProfesional
+ *       200:
+ *         description: "Turno encontrado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Turno encontrado"
+ *               result: true
+ *               turno: {
+ *                 id: 123,
+ *                 fecha: "2025-10-03",
+ *                 hora_inicio: "09:00",
+ *                 hora_fin: "09:30",
+ *                 estado: "pendiente",
+ *                 tipo: "consulta"
+ *               }
+ *       404:
+ *         description: "Turno no encontrado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "El usuario no tiene turnos"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error al buscar turno"
+ *               result: false
+ */
+router.get("/buscarTurno", authMiddleware, async (req, res) => {
+    try {
+
+        logToPage(`Buscando turnos para el usuario email: ${req.user.email}`);
+        const [turnos] = await pool.query(`
+            SELECT 
+                t.ID AS turnoId,
+                u.nombre AS nombrePaciente,
+                u.apellido AS apellidoPaciente,
+                DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fechaTurno,
+                t.hora_inicio,
+                t.hora_fin,
+                t.estado,
+                t.tipo,
+                up.nombre AS nombreProfesional,
+                up.apellido AS apellidoProfesional
+            FROM Turno t
+            JOIN Usuario u ON t.paciente_ID = u.ID
+            JOIN Usuario up ON t.profesional_ID = up.ID
+            WHERE u.ID = ?
+            `, [req.user.id]);
+
+
+        if (turnos.length === 0) {
+            logToPage(`El usuario con email ${req.user.email} no tiene turnos.`);
+            return res.status(404).json({
+                message: "El usuario no tiene turnos",
+                result: false
+            });
+        }
+
+        logToPage(`Turnos encontrados para el usuario con email ${req.user.email}: ${turnos.length} turnos.`);
+        res.json({
+            message: "Turnos encontrados",
+            result: true,
+            turnos: turnos
+        });
+    } catch (error) {
+        logErrorToPage("Error al buscar turno:", error);
+        res.status(500).json({
+            message: "Error al buscar turno",
+            result: false
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /nuevoTurno:
+ *   post:
+ *     tags:
+ *       - CRUD Turnos
+ *     summary: "Crear nuevo turno y programa recordatorio 1 hora antes"
+ *     description: "Crea un nuevo turno en el sistema.(requiere autenticación) Y generar recordatorio una hora antes"
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - emailProfesional
  *               - fecha
  *               - hora_inicio
  *               - hora_fin
@@ -199,7 +291,6 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
         const diaSemana = obtenerDiaSemana(fecha);
 
         if (!emailProfesional || !fecha || !hora_inicio || !hora_fin || !estado || !tipo)
-            logErrorToPage("Faltan datos obligatorios para crear el turno");
             return res.status(400).json({
                 message: "Faltan datos obligatorios",
                 result: false

@@ -1,6 +1,7 @@
 import { Router } from "express";
 const router = Router();
 import pool from "../db.js";
+import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 
 
 import { authMiddleware } from "../middleware/auth.js";
@@ -13,17 +14,21 @@ import { authMiddleware } from "../middleware/auth.js";
  *       - CRUD disponibilidad profesional
  *     summary: "Obtener disponibilidad profesional (requiere autenticación)"
  *     description: "Obtiene la disponibilidad del profesional autenticado."
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 description: Token JWT de autenticación
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Token JWT de autenticación
+ *         example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       - name: email
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Email del profesional que se desea obtener la disponibilidad
+ *         example: "doctor@mail.com"
  *     responses:
  *       200:
  *         description: "Disponibilidad encontrada"
@@ -55,16 +60,16 @@ import { authMiddleware } from "../middleware/auth.js";
  */
 router.get("/obtenerDisponibilidadProfesional", authMiddleware, async (req, res) => {
     try {
-        logToPage(`Buscando disponibilidad del profesional: ${req.user.email}`);
-        const [rows] = await pool.query("SELECT d.ID, u.nombre + u.apellido AS nombre, d.dia_semana, d.hora_inicio, d.hora_fin FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE d.profesional_ID = ?", [req.user.id]);
+        logToPage(`Buscando disponibilidad del profesional: ${req.query.email}`);
+        const [rows] = await pool.query("SELECT d.ID, u.nombre + u.apellido AS nombre, d.dia_semana, d.hora_inicio, d.hora_fin FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE u.email = ?", [req.query.email]);
 
         if (rows.length === 0) {
-            logErrorToPage("No se encontró disponibilidad para el profesional:", req.user.email);
+            logErrorToPage("No se encontró disponibilidad para el profesional:", req.query.email);
             return res.status(404).json({ message: "No se encontró disponibilidad para este profesional", result: false });
         }
 
         if (rows.length > 0) {
-            logToPage(`Disponibilidad encontrada para el profesional: ${req.user.email}`);
+            logToPage(`Disponibilidad encontrada para el profesional: ${req.query.email}`);
             return res.status(200).json({ message: "Disponibilidad encontrada", disponibilidad: rows, result: true });
         }
 
@@ -192,6 +197,7 @@ router.get("/obtenerDisponibilidadProfesional", authMiddleware, async (req, res)
 // Ruta protegida, solo accesible con token válido
 router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, res) => {
     let connection;
+    logToPage(`Estableciendo disponibilidad para el profesional: ${req.user.email}`);
     try {
         const idProfesional = req.user.id;
 
@@ -267,7 +273,7 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
     } catch (error) {
         if (connection) await connection.rollback();
         logErrorToPage("Error al actualizar disponibilidad:", error);
-        res.status(500).json({ message: "Error interno", error, result: false });
+        res.status(500).json({ message: "Error interno" + error, result: false });
     } finally {
         if (connection) connection.release();
     }
