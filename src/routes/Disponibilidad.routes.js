@@ -2,6 +2,7 @@ import { Router } from "express";
 const router = Router();
 import pool from "../db.js";
 import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
+import { obtenerDiaSemana } from "../Utils/obtenerDiaSemana.js";
 
 
 import { authMiddleware } from "../middleware/auth.js";
@@ -194,7 +195,6 @@ router.get("/obtenerDisponibilidadProfesional", authMiddleware, async (req, res)
  *               message: "Error interno"
  *               result: false
  */
-// Ruta protegida, solo accesible con token válido
 router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, res) => {
     let connection;
     logToPage(`Estableciendo disponibilidad para el profesional: ${req.user.email}`);
@@ -279,6 +279,121 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
     }
 });
 
+/**
+ * @swagger
+ * /obtenerDisponibilidadDisponible:
+ *   post:
+ *     tags:
+ *       - CRUD disponibilidad profesional
+ *     summary: "Obtiene la disponibilidad DISPONIBLE de un profesional con el email proporcionado"
+ *     description: "Obtiene la disponibilidad DISPONIBLE del mail profesional proporcionado."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       - name: email
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "profesional@example.com"
+ *     responses:
+ *       200:
+ *         description: "Disponibilidad DISPONIBLE encontrada"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Disponibilidad DISPONIBLE encontrada"
+ *               result: true
+ *       400:
+ *         description: "No se proporciono email válido"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "No se proporciono email válido"
+ *               result: false
+ *       500:
+ *         description: "Error interno"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error interno"
+ *               result: false
+ */
+router.get("/obtenerDisponibilidadDisponible", authMiddleware, async (req, res) => {
+    const { email } = req.query;
+    try {
+        if (!email) {
+            logErrorToPage("No se proporciono email válido");
+            return res.status(400).json({ message: "No se proporciono email válido", result: false });
+        }
+        logToPage(`Buscando disponibilidad del profesional: ${email}`);
+        const [disponibilidad] = await pool.query("SELECT d.ID,d.dia_semana, d.hora_inicio, d.hora_fin FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE u.email = ?", [email]);
+
+
+        if (disponibilidad.length === 0) {
+            logErrorToPage("No se encontró disponibilidad para el profesional");
+            return res.status(404).json({ message: "No se encontró disponibilidad para este profesional", result: false });
+        } else {
+            logToPage(`Disponibilidad encontrada para el profesional.`);
+        }
+
+        logToPage("Buscando turnos RESERVADOS del profesional:" + email);
+        const [turnos] = await pool.query("SELECT t.fecha, t.hora_inicio, t.hora_fin FROM Turno t JOIN Usuario u ON t.profesional_ID = u.ID WHERE u.email = ? AND t.estado = 'pendiente'", [email]);
+        logToPage(`Turnos reservados encontrados para el profesional.`);
+
+
+
+
+        logToPage("Filtrando disponibilidad para obtener solo horarios DISPONIBLES");
+        const disponibilidadFiltrada = disponibilidad.filter(dia => {
+            const turnosDelDia = turnos.filter(turno => obtenerDiaSemana(turno.fecha) === dia.dia_semana);
+            let horaInicio = dia.hora_inicio;
+            let horaFin = dia.hora_fin;
+            for (const turno of turnosDelDia) {
+                const turnoInicio = turno.hora_inicio;
+                const turnoFin = turno.hora_fin;
+                if (turnoInicio === horaInicio && turnoFin === horaFin) {
+                    return false; // Quitar del arreglo principal
+                }
+            }
+
+            return true; // Mantener en el arreglo principal
+        });
+
+        res.status(200).json({ disponibilidad: disponibilidadFiltrada, message: "Disponibilidad DISPONIBLE encontrada", result: true });
+    } catch (error) {
+        logErrorToPage("Error al obtener disponibilidad:" + error);
+        res.status(500).json({ error: "Error al obtener disponibilidad" });
+    }
+});
+
+
+router.get("/obtenerDisponibilidadDisponibleWalo", authMiddleware, async (req, res) => {
+    const { email } = req.query;
+    try {
+        logToPage(`Buscando disponibilidad del profesional: ${email}`);
+
+        await pool.query("set lc_time_names = 'es_ES';");
+        const [disponibilidad] = await pool.query(`SELECT tur.*,
+                                                          dis.*
+                                                   FROM Turno tur
+                                                   LEFT JOIN Disponibilidad dis ON dis.profesional_ID = tur.profesional_ID
+                                                   WHERE tur.profesional_ID = (SELECT usu.ID 
+                                                                               FROM Usuario usu
+                                                                               WHERE usu.email = ${email})
+                                                   AND NOT(LOWER(DAYNAME(tur.fecha)) = LOWER(dis.dia_semana) AND dis.hora_inicio = tur.hora_inicio AND dis.hora_fin = tur.hora_fin);`);
+
+        res.status(200).json({ res: disponibilidad });
+
+    } catch (error) {
+        logErrorToPage("Error al obtener disponibilidad:" + error);
+        res.status(500).json({ error: "Error al obtener disponibilidad" });
+    }
+});
 
 
 

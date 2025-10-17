@@ -95,3 +95,17 @@ export async function enviarMailConfirmacionTurno(to, nombrePaciente, profesiona
   </div>${footer}`
   });
 }
+
+// Función para enviar mail CANCELACION de turno
+export async function enviarMailCancelacionTurno(to, nombrePaciente, nombreProfesional, apellidoProfesional, hora_inicio, fecha) {
+  return transporter.sendMail({
+      from: '"MediTurnos" <MediTurnos@gmail.com>',
+      to,
+      subject: `CANCELACIÓN DE TURNO CON ${nombrePaciente}`, 
+      html: `${header}<div style="padding:32px 24px; font-family:'Segoe UI',Arial,sans-serif; color:#222;">
+      <div style="margin-bottom:16px; text-align:center; font-size:18px;">
+          <b>Hola ${nombreProfesional} ${apellidoProfesional}, ${nombrePaciente} canceló su turno de las ${hora_inicio} el dia ${fecha}.</b> <br/>
+      </div>
+  </div>${footer}`
+  });
+}

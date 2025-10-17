@@ -4,7 +4,8 @@ import usuarioRoutes from "./routes/usuario.routes.js";
 import homeRoutes from "./routes/home.routes.js";
 import mailroutes from "./routes/mail.routes.js";
 import disponibilidadRoutes from "./routes/Disponibilidad.routes.js";
-import turnosRoutes from "./routes/Turnos.routes.js";
+import turnosRoutes from "./routes/turnos.routes.js";
+import bloqueoRoutes from "./routes/Bloqueo.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import cookieParser from "cookie-parser";
@@ -50,6 +51,9 @@ app.use(homeRoutes)
 app.use(mailroutes)
 app.use(disponibilidadRoutes)
 app.use(turnosRoutes)
+app.use(bloqueoRoutes);
+app.use(express.json({ limit: "10mb" })); // <- aumentá a lo que necesites
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 
 //configuracion

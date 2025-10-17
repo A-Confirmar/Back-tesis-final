@@ -1,18 +1,14 @@
 import { Router } from "express";
 const router = Router();
 import pool from "../db.js";
-import dayjs from "dayjs";
 import { recordatorioDeTurno, cancelarRecordatorioDeTurno } from "../Utils/recordatorios.js";
-import { enviarMailConfirmacionTurno } from "../Utils/mailer.js";
+import { enviarMailConfirmacionTurno, enviarMailCancelacionTurno } from "../Utils/mailer.js";
 import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
+import { obtenerDiaSemana } from "../Utils/obtenerDiaSemana.js";
 
 import { authMiddleware } from "../middleware/auth.js";
 
-function obtenerDiaSemana(fechaStr) {
-    const dias = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
-    const d = dayjs(fechaStr);
-    return dias[d.day()];
-}
+
 
 
 /**
@@ -111,44 +107,42 @@ router.get("/buscarTurno", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
- * /nuevoTurno:
- *   post:
+ * /obtenerMisTurnosPendientes:
+ *   get:
  *     tags:
  *       - CRUD Turnos
- *     summary: "Crear nuevo turno y programa recordatorio 1 hora antes"
- *     description: "Crea un nuevo turno en el sistema.(requiere autenticación) Y generar recordatorio una hora antes"
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *               - emailProfesional
+ *     summary: "Obtener mis turnos pendientes"
+ *     description: "Devuelve una lista de turnos pendientes para el profesional autenticado."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     responses:
  *       200:
- *         description: "Turno encontrado"
+ *         description: "Turnos pendientes encontrados"
  *         content:
  *           application/json:
  *             example:
- *               message: "Turno encontrado"
+ *               message: "Turnos pendientes encontrados"
  *               result: true
- *               turno: {
- *                 id: 123,
- *                 fecha: "2025-10-03",
- *                 hora_inicio: "09:00",
- *                 hora_fin: "09:30",
- *                 estado: "pendiente",
- *                 tipo: "consulta"
- *               }
+ *               turnos:
+ *                 - turnoId: 123
+ *                   nombrePaciente: "Juan"
+ *                   apellidoPaciente: "Pérez"
+ *                   fechaTurno: "2025-10-03"
+ *                   hora_inicio: "09:00"
+ *                   hora_fin: "09:30"
+ *                   estado: "pendiente"
+ *                   tipo: "consulta"
  *       404:
- *         description: "Turno no encontrado"
+ *         description: "El profesional no tiene turnos pendientes"
  *         content:
  *           application/json:
  *             example:
- *               message: "El usuario no tiene turnos"
+ *               message: "El profesional no tiene turnos pendientes"
  *               result: false
  *       500:
  *         description: "Error interno del servidor"
@@ -158,51 +152,48 @@ router.get("/buscarTurno", authMiddleware, async (req, res) => {
  *               message: "Error al buscar turno"
  *               result: false
  */
-router.get("/buscarTurno", authMiddleware, async (req, res) => {
+router.get("/obtenerMisTurnosPendientes", authMiddleware, async (req, res) => {
     try {
+        const user = req.user; // Usuario autenticado
 
-        logToPage(`Buscando turnos para el usuario email: ${req.user.email}`);
-        const [turnos] = await pool.query(`
-            SELECT 
-                t.ID AS turnoId,
-                u.nombre AS nombrePaciente,
-                u.apellido AS apellidoPaciente,
-                DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fechaTurno,
-                t.hora_inicio,
-                t.hora_fin,
-                t.estado,
-                t.tipo,
-                up.nombre AS nombreProfesional,
-                up.apellido AS apellidoProfesional
-            FROM Turno t
-            JOIN Usuario u ON t.paciente_ID = u.ID
-            JOIN Usuario up ON t.profesional_ID = up.ID
-            WHERE u.ID = ?
-            `, [req.user.id]);
-
+        logToPage(`Buscando turnos pendientes para el profesional con email: ${user.email}`);
+        const [turnos] = await pool.query(`SELECT
+            t.ID AS turnoId, 
+            u.nombre AS nombrePaciente, 
+            u.apellido AS apellidoPaciente, 
+            DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fechaTurno, 
+            t.hora_inicio, 
+            t.hora_fin, 
+            t.estado, 
+            t.tipo 
+            FROM Turno t 
+            JOIN Usuario u ON t.paciente_ID = u.ID 
+            JOIN Usuario up ON t.profesional_ID = up.ID 
+            WHERE up.ID = ? AND t.estado = 'pendiente'`, [user.id]);
 
         if (turnos.length === 0) {
-            logToPage(`El usuario con email ${req.user.email} no tiene turnos.`);
+            logToPage(`El profesional con email ${user.email} no tiene turnos pendientes.`);
             return res.status(404).json({
-                message: "El usuario no tiene turnos",
+                message: "El profesional no tiene turnos pendientes",
                 result: false
+            });
+        } else {
+            logToPage(`Turnos pendientes encontrados para el profesional con email ${user.email}: ${turnos.length} turnos.`);
+            res.json({
+                message: "Turnos pendientes encontrados",
+                result: true,
+                turnos: turnos
             });
         }
 
-        logToPage(`Turnos encontrados para el usuario con email ${req.user.email}: ${turnos.length} turnos.`);
-        res.json({
-            message: "Turnos encontrados",
-            result: true,
-            turnos: turnos
-        });
     } catch (error) {
-        logErrorToPage("Error al buscar turno:", error);
         res.status(500).json({
             message: "Error al buscar turno",
             result: false
         });
     }
 });
+
 
 /**
  * @swagger
@@ -363,16 +354,16 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
- * /eliminarTurno:
- *   delete:
+ * /cancelarTurno:
+ *   put:
  *     tags:
  *       - CRUD Turnos  
- *     summary: "Eliminar turno y recordatorio"
- *     description: "Elimina un turno existente (requiere autenticación) Y elimina el recordatorio asociado"
+ *     summary: "Actualizar estado del turno a cancelado y recordatorios eliminados"
+ *     description: "Actualiza el estado de un turno existente a cancelado (requiere autenticación) y elimina el recordatorio asociado"
  *     parameters:
  *       - in: body
  *         name: body
- *         description: "ID del turno a eliminar"
+ *         description: "ID del turno a cancelar"
  *         required:
  *           - token
  *           - turnoId
@@ -393,24 +384,26 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
  *       500:
  *         description: "Error al eliminar turno"
  */
-router.delete("/eliminarTurno", authMiddleware, async (req, res) => {
+router.put("/cancelarTurno", authMiddleware, async (req, res) => {
     try {
         const user = req.user; // Usuario autenticado
         const { turnoId } = req.body;
-        const [check] = await pool.query("SELECT ID FROM Turno WHERE ID = ? AND paciente_ID = ?", [turnoId, user.id]);
+        const [rows] = await pool.query("SELECT u.ID, u.email, u.nombre, u.apellido, t.hora_inicio, DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fecha FROM Turno t JOIN Usuario u ON t.profesional_ID = u.ID WHERE t.ID = ? AND t.paciente_ID = ?", [turnoId, user.id]);
 
-        if (check.length === 0) {
+        if (rows.length === 0) {
             logErrorToPage(`El turno con ID ${turnoId} no existe o no pertenece al usuario con email ${user.email}`);
             return res.status(404).json({
-                message: "Turno no encontrado",
+                message: "Turno no encontrado para cancelar",
                 result: false
             });
         }
 
         // Eliminar el turno de la base de datos
-        const [result] = await pool.query("DELETE FROM Turno WHERE id = ? AND paciente_ID = ?", [turnoId, user.id]);
-        if (result.affectedRows === 1) {
-            logToPage(`Turno con ID ${turnoId} eliminado exitosamente para el usuario con email ${user.email}`);
+        const [result] = await pool.query("UPDATE Turno SET estado = 'cancelado' WHERE id = ? AND paciente_ID = ?", [turnoId, user.id]);
+        console.log(result);
+        if (result.changedRows === 1) {
+            logToPage(`Turno con ID ${turnoId} cancelado exitosamente para el usuario con email ${user.email}`);
+            enviarMailCancelacionTurno(rows[0].email, user.name, rows[0].nombre, rows[0].apellido, rows[0].hora_inicio, rows[0].fecha);
             // Cancelar el recordatorio
             const recordatorio = cancelarRecordatorioDeTurno(turnoId);
             if (recordatorio) {
@@ -419,7 +412,7 @@ router.delete("/eliminarTurno", authMiddleware, async (req, res) => {
                 logErrorToPage("No se pudo cancelar el recordatorio o no existía");
             }
             res.status(200).json({
-                message: "Turno eliminado exitosamente",
+                message: "Turno cancelado exitosamente",
                 result: true
             });
         } else {
@@ -430,9 +423,9 @@ router.delete("/eliminarTurno", authMiddleware, async (req, res) => {
             });
         }
     } catch (error) {
-        logErrorToPage("Error al eliminar turno:", error);
+        logErrorToPage("Error al cancelar turno:", error);
         res.status(500).json({
-            message: "Error al eliminar turno: " + error.message,
+            message: "Error al cancelar turno: " + error.message,
             result: false
         });
     }

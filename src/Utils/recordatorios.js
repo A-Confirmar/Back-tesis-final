@@ -19,19 +19,20 @@ export const recordatorioDeTurno = async (nombrePaciente, emailPaciente, profesi
             }
         });
 
-        // Eliminación automática del turno
-        const jobEliminacion = schedule.scheduleJob(`${jobName}-eliminacion`, fechaTurno, async () => {
+                // Eliminación cambio de estado del turno
+        const jobEstadoFinalizado = schedule.scheduleJob(`${jobName}-EstadoFinalizado`, fechaTurno, async () => {
             try {
-                const [result] = await pool.query("DELETE FROM Turno WHERE ID = ?", [turnoId]);
+                const [result] = await pool.query("UPDATE Turno SET estado = 'finalizado' WHERE ID = ?", [turnoId]);
                 if (result.affectedRows > 0) {
-                    console.log(`🗑️ Turno ${turnoId} eliminado automáticamente (paciente ${emailPaciente})`);
+                    console.log(`🔄 Turno ${turnoId} cambio si estado de pendiente a finalizado automáticamente (paciente ${emailPaciente})`);
                 } else {
-                    console.warn(`⚠️ No se encontró el turno ${turnoId} para eliminar`);
+                    console.warn(`⚠️ No se encontró el turno ${turnoId} para cambiar su estado automáticamente`);
                 }
             } catch (error) {
-                console.error("❌ Error al eliminar el turno automáticamente:", error);
+                console.error("❌ Error al cambiar el estado del turno automáticamente:", error);
             }
         });
+
 
         if (job) {
             console.log(`🕒 Recordatorio programado para ${job.nextInvocation()}`);
@@ -47,9 +48,11 @@ export const recordatorioDeTurno = async (nombrePaciente, emailPaciente, profesi
 export const cancelarRecordatorioDeTurno = (turnoId) => {
     const jobName = `recordatorio-${turnoId}`;
     const job = schedule.scheduledJobs[jobName];
+    const jobestado = schedule.scheduledJobs[jobName+"-EstadoFinalizado"];
     if (job) {
         job.cancel();
-        console.log(`Recordatorio para el turno ${turnoId} ha sido cancelado.`);
+        jobestado.cancel();
+        console.log(`Recordatorio y estado finalizado para el turno ${turnoId} ha sido cancelado.`);
         return true;
     } else {
         console.log(`No se encontró un recordatorio programado para el turno ${turnoId}.`);

@@ -7,7 +7,110 @@ import bcrypt from "bcrypt";
 import { authMiddleware } from "../middleware/auth.js";
 import { enviarMailRegistro } from "../Utils/mailer.js";
 import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
+import { uploadImage } from "../Utils/cloudinary.js";
+import fs from "fs"; // para borrar el archivo temporal
+import { upload } from "../Utils/multer.js";
+import { log } from "console";
 
+
+router.get("/obtenerListaDePacientesVinculados", authMiddleware, async (req, res) => {
+  try{
+    const userId = req.user.id; // Obtener el ID del usuario del token
+    const [result] = await pool.query(`select u.nombre, u.apellido, u.email, u.fecha_nacimiento, u.telefono, u.localidad, u.imagenPerfil  from Turno t join Usuario u on u.ID = t.Paciente_ID where t.profesional_ID = ? group by u.ID`,
+       [userId]);
+    if (result.length === 0 ) {
+      logErrorToPage("No se encontraron pacientes vinculados para el profesional con ID: ", userId);
+      return res.status(404).json({ message: "No se encontraron pacientes vinculados", result: false });
+
+    }else{
+      logToPage("Pacientes vinculados obtenidos para el profesional con ID: ", userId);
+      res.status(200).json({ message: "Pacientes vinculados obtenidos", data: result, result: true });
+    }
+
+  }catch(error){
+    logErrorToPage("Error en /obtenerListaDePacientesVinculados: ", error);
+    return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
+  }
+  
+});
+
+/**
+ * @swagger
+ * /cargarImagenUsuario:
+ *   post:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Subir imagen de perfil del usuario"
+ *     description: "Permite subir una imagen de perfil en formato PNG para el usuario autenticado."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               imagen:
+ *                 type: string
+ *                 format: binary
+ *                 description: "Archivo de imagen en formato PNG"
+ *     responses:
+ *       200:
+ *         description: "Imagen cargada exitosamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               imagenUrl: "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
+ *               message: "Imagen cargada exitosamente"
+ *               result: true
+ *       400:
+ *         description: "Error al subir la imagen"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "No se proporcionó ninguna imagen"
+ *               result: false
+ *       401:
+ *         description: "Token inválido o no enviado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Token requerido"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Algo salió mal: error"
+ *               result: false
+ */
+router.post("/cargarImagenUsuario", authMiddleware, upload.single("imagen"), async (req, res) => {
+  try {
+    const userId = req.user.id; // Obtener el ID del usuario autenticado
+
+    // Subir la imagen a Cloudinary
+    const imageUrl = await uploadImage(`./assets/images/perfil.png`, `usuario_${userId}`);
+    logToPage("Imagen subida a Cloudinary: " + imageUrl);
+
+    // Guardar la URL en la base de datos
+    const [result] = await pool.query(
+      "UPDATE Usuario SET imagenPerfil = ? WHERE id = ?",
+      [imageUrl, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      logErrorToPage("Usuario no encontrado para cargar imagen: ", userId);
+      res.status(404).json({ message: "Usuario no encontrado", result: false });
+    }
+
+    // Borrar el archivo temporal
+    fs.unlinkSync("./assets/images/perfil.png");
+
+    res.json({ message: "Imagen cargada exitosamente", imageUrl: imageUrl, result: true });
+  } catch (error) {
+    res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
+  }
+});
 
 /**
  * @swagger
@@ -42,6 +145,7 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
  *                 apellido: "Pérez"
  *                 telefono: "2995555555"
  *                 localidad: "Aregentina"
+ *                 imagenPerfil: "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
  *                 fecha_nacimiento: "01-01-2000"
  *                 especialidad: "Cardiología"
  *                 descripcion: "Médico cardiólogo"
@@ -81,6 +185,7 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
     u.apellido,
     u.telefono,
     u.localidad,
+    u.imagenPerfil,
     DATE_FORMAT(u.fecha_nacimiento, '%d-%m-%Y') AS fecha_nacimiento,
     p.especialidad,
     p.descripcion,
@@ -171,7 +276,9 @@ router.post("/logIn", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const [rows] = await pool.query(`SELECT id, email, password FROM Usuario WHERE email = ?`, [email]);
+    await pool.query(`set lc_time_names = 'es_ES'`);
+    const [rows] = await pool.query(`SELECT id, email, password, nombre FROM Usuario WHERE email = ?`, [email]);
+
     if (rows.length === 0) {
       logErrorToPage("Usuario no encontrado con email: ", email);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
@@ -188,6 +295,7 @@ router.post("/logIn", async (req, res) => {
       email: rows[0].email,
       name: rows[0].nombre
     }, config.SECRETO, { expiresIn: "1h" });
+    console.log("Token nombre: ", rows[0].nombre);
 
     // Guardar un token JWT en una cookie
     // res.cookie('token', token, {
@@ -197,7 +305,7 @@ router.post("/logIn", async (req, res) => {
     //   maxAge: 60 * 60 * 1000 // 1 hora en milisegundos
     // });
 
-    logToPage("Usuario logueado correctamente: "+ email);
+    logToPage("Usuario logueado correctamente: " + email);
     return res.status(200).json({ token: token, message: "Usuario logueado", result: true })
   } catch (error) {
     logErrorToPage("Error en /logIn: ", error);
@@ -314,10 +422,10 @@ router.post("/register", async (req, res) => {
 
     const [resultSelect] = await connection.query("SELECT * FROM Usuario WHERE email = ?", [email]);
     if (resultSelect.length > 0) {
-      logErrorToPage("Email ya en uso: "+ email);
+      logErrorToPage("Email ya en uso: " + email);
       return res.status(400).json({ message: "El email ya está en uso", result: false }); //mail repetido
     }
-    
+
     if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono || !localidad) {
       logErrorToPage("Faltan datos obligatorios para el registro: " + JSON.stringify(req.body));
       return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
@@ -361,7 +469,7 @@ router.post("/register", async (req, res) => {
 
     await connection.commit();
     res.status(201).json({ message: "Usuario creado exitosamente", result: true }); //201 Created
-    logToPage("Usuario registrado: "+ email);
+    logToPage("Usuario registrado: " + email);
     enviarMailRegistro(email, nombre).catch(err => logErrorToPage("Error al enviar mail de registro: ", err));
   } catch (error) {
     logErrorToPage("Error en al registrar: " + error);
@@ -610,23 +718,23 @@ router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
  *               message: "Algo salió mal: error"
  *               result: false
  */
-router.get("/buscarProfesional", authMiddleware, async(req, res) => {
-  try{
-  const { leyenda } = req.query;
+router.get("/buscarProfesional", authMiddleware, async (req, res) => {
+  try {
+    const { leyenda } = req.query;
 
-  // if (!leyenda) {
-  //   logErrorToPage("Falta la leyenda del profesional en la búsqueda🧟‍♂️");
-  //   return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
-  // }
+    // if (!leyenda) {
+    //   logErrorToPage("Falta la leyenda del profesional en la búsqueda🧟‍♂️");
+    //   return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
+    // }
 
-  const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%`+" || *", `%${leyenda}%`]);
-  if (result.length === 0) {
-    logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
-    return res.status(404).json({ message: "No se encontraron profesionales", result: false });
-  }
+    const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%` + " || *", `%${leyenda}%`]);
+    if (result.length === 0) {
+      logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
+      return res.status(404).json({ message: "No se encontraron profesionales", result: false });
+    }
 
-  logToPage("Profesionales encontrados para la leyenda: ", leyenda);
-  res.status(200).json({ message: "Profesionales encontrados", result: true, data: result });
+    logToPage("Profesionales encontrados para la leyenda: ", leyenda);
+    res.status(200).json({ message: "Profesionales encontrados", result: true, data: result });
   } catch (error) {
     logErrorToPage("Error en /buscarProfesional: ", error);
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
@@ -731,7 +839,7 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
     // Verificar que el usuario existe
     const [rows] = await pool.query("SELECT id FROM Usuario WHERE email = ?", [email]);
     if (rows.length === 0) {
-      logErrorToPage("Usuario no encontrado con email: "+ email);
+      logErrorToPage("Usuario no encontrado con email: " + email);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
     }
 
