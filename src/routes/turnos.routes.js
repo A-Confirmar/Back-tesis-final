@@ -17,7 +17,7 @@ import { authMiddleware } from "../middleware/auth.js";
  *   get:
  *     tags:
  *       - CRUD Turnos
- *     summary: "Buscar turno por usuario"
+ *     summary: "Trae todos los turnos del paciente logueado."
  *     description: "Busca todos los turnos existentes para el usuario autenticado."
  *     security:
  *       - bearerAuth: []
@@ -75,9 +75,9 @@ router.get("/buscarTurno", authMiddleware, async (req, res) => {
                 t.tipo,
                 up.nombre AS nombreProfesional,
                 up.apellido AS apellidoProfesional
-            FROM Turno t
-            JOIN Usuario u ON t.paciente_ID = u.ID
-            JOIN Usuario up ON t.profesional_ID = up.ID
+            FROM turno t
+            JOIN usuario u ON t.paciente_ID = u.ID
+            JOIN usuario up ON t.profesional_ID = up.ID
             WHERE u.ID = ?
             `, [req.user.id]);
 
@@ -166,9 +166,9 @@ router.get("/obtenerMisTurnosPendientes", authMiddleware, async (req, res) => {
             t.hora_fin, 
             t.estado, 
             t.tipo 
-            FROM Turno t 
-            JOIN Usuario u ON t.paciente_ID = u.ID 
-            JOIN Usuario up ON t.profesional_ID = up.ID 
+            FROM turno t 
+            JOIN usuario u ON t.paciente_ID = u.ID 
+            JOIN usuario up ON t.profesional_ID = up.ID 
             WHERE up.ID = ? AND t.estado = 'pendiente'`, [user.id]);
 
         if (turnos.length === 0) {
@@ -194,15 +194,14 @@ router.get("/obtenerMisTurnosPendientes", authMiddleware, async (req, res) => {
     }
 });
 
-
 /**
  * @swagger
  * /nuevoTurno:
  *   post:
  *     tags:
  *       - CRUD Turnos
- *     summary: "Crear nuevo turno y programa recordatorio 1 hora antes"
- *     description: "Crea un nuevo turno en el sistema.(requiere autenticación) Y generar recordatorio una hora antes"
+ *     summary: "Crear nuevo turno, pago y programa recordatorio 1 hora antes de la hora de inicio"
+ *     description: "Crea un nuevo turno y pago en el sistema .(requiere autenticación) Y generar recordatorio una hora antes"
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -276,19 +275,21 @@ router.get("/obtenerMisTurnosPendientes", authMiddleware, async (req, res) => {
  *               result: false
  */
 router.post("/nuevoTurno", authMiddleware, async (req, res) => {
+        const conexión = await pool.getConnection();
     try {
         const user = req.user; // Usuario autenticado
-        const { emailProfesional, fecha, hora_inicio, hora_fin, estado, tipo } = req.body;
+        const { emailProfesional, fecha, hora_inicio, hora_fin, tipo } = req.body;
         const diaSemana = obtenerDiaSemana(fecha);
 
-        if (!emailProfesional || !fecha || !hora_inicio || !hora_fin || !estado || !tipo)
+        if (!emailProfesional || !fecha || !hora_inicio || !hora_fin || !tipo)
             return res.status(400).json({
                 message: "Faltan datos obligatorios",
                 result: false
             });
 
+            logToPage(`Verificando disponibilidad del profesional con email ${emailProfesional} para el ${diaSemana} de ${hora_inicio} a ${hora_fin}`);
         const [result] = await pool.query(
-            "SELECT * FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE u.email = ? AND d.dia_semana = ? AND d.hora_inicio <= ? AND d.hora_fin >= ?",
+            "SELECT * FROM disponibilidad d JOIN usuario u ON d.profesional_ID = u.ID WHERE u.email = ? AND d.dia_semana = ? AND d.hora_inicio <= ? AND d.hora_fin >= ?",
             [emailProfesional, diaSemana, hora_inicio, hora_fin]
         );
 
@@ -297,9 +298,9 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
         if (result.length > 0) {
             logToPage(`El profesional con email ${emailProfesional} tiene disponibilidad el ${diaSemana} de ${hora_inicio} a ${hora_fin}`);
             idProfesional = result[0].profesional_ID;
-            // Verificar si ya existe un turno en el mismo horario
+            logToPage(`Verificando si ya existe un turno para el profesional con email ${emailProfesional} el ${fecha} de ${hora_inicio} a ${hora_fin}`);
             [turnoExistente] = await pool.query(
-                "SELECT * FROM Turno t JOIN Usuario u ON u.ID = t.profesional_ID WHERE u.email = ?AND fecha = ?AND (? < t.hora_fin AND? > t.hora_inicio)",
+                "SELECT * FROM turno t JOIN usuario u ON u.ID = t.profesional_ID WHERE u.email = ? AND fecha = ?AND (? = t.hora_fin AND? = t.hora_inicio)",
                 [emailProfesional, fecha, hora_inicio, hora_fin]
             );
         } else {
@@ -319,16 +320,29 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
         }
         // Insertar el nuevo turno
         logToPage(`Creando nuevo turno para el usuario ${user.email} con el profesional ${emailProfesional} el ${fecha} de ${hora_inicio} a ${hora_fin}`);
-        const [reserva] = await pool.query(
-            "INSERT INTO Turno (paciente_ID, profesional_ID, fecha, hora_inicio, hora_fin, estado, tipo) VALUES (?,?, ?, ?, ?, ?, ?)",
-            [user.id, idProfesional, fecha, hora_inicio, hora_fin, estado, tipo]
+
+        await conexión.beginTransaction();
+        const [reserva] = await conexión.query(
+            "INSERT INTO turno (paciente_ID, profesional_ID, fecha, hora_inicio, hora_fin, tipo) VALUES (?, ?, ?, ?, ?, ?)",
+            [user.id, idProfesional, fecha, hora_inicio, hora_fin, tipo]
         );
         if (reserva.affectedRows === 1) {
             logToPage(`Turno creado exitosamente con ID ${reserva.insertId}`);
 
+            logToPage("Generando pago relacionado al turno en PENDIENTE.")
+
+            const [pago] = await conexión.query("INSERT INTO pago (turno_ID, monto, estado) VALUES (?,(SELECT valorConsulta FROM profesional WHERE ID = ?), 'pendiente')", [reserva.insertId, idProfesional]);
+
+            if (pago.affectedRows === 1) {
+                logToPage(`Pago generado exitosamente con ID ${pago.insertId}`);
+            } else {
+                conexión.rollback();
+                logErrorToPage(`Error al generar pago para el turno ID ${reserva.insertId}`);
+            }
+
             // Obtener el nombre del paciente y del profesional
-            const [pacienteRows] = await pool.query("SELECT nombre FROM Usuario WHERE email = ?", [user.email]);
-            const [profesionalRows] = await pool.query("SELECT nombre, apellido FROM Usuario WHERE id = ?", [idProfesional]);
+            const [pacienteRows] = await pool.query("SELECT nombre FROM usuario WHERE email = ?", [user.email]);
+            const [profesionalRows] = await pool.query("SELECT nombre, apellido FROM usuario WHERE id = ?", [idProfesional]);
 
             // Programar el recordatorio
             logToPage(`Programando recordatorio para el turno ID ${reserva.insertId}`);
@@ -339,16 +353,21 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
             enviarMailConfirmacionTurno(user.email, pacienteRows[0].nombre, profesionalRows[0], hora_inicio, fecha);
             res.status(201).json({
                 message: "Turno creado exitosamente",
+                turnoId: reserva.insertId,
                 result: true
             });
         }
 
+        await conexión.commit();
     } catch (error) {
+        await conexión.rollback();
         logErrorToPage("Error al crear turno:", error);
         res.status(500).json({
             message: "Error al crear turno: " + error.message,
             result: false
         });
+    }finally {
+        await conexión.release();
     }
 });
 
@@ -388,7 +407,7 @@ router.put("/cancelarTurno", authMiddleware, async (req, res) => {
     try {
         const user = req.user; // Usuario autenticado
         const { turnoId } = req.body;
-        const [rows] = await pool.query("SELECT u.ID, u.email, u.nombre, u.apellido, t.hora_inicio, DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fecha FROM Turno t JOIN Usuario u ON t.profesional_ID = u.ID WHERE t.ID = ? AND t.paciente_ID = ?", [turnoId, user.id]);
+        const [rows] = await pool.query("SELECT u.ID, u.email, u.nombre, u.apellido, t.hora_inicio, DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fecha FROM turno t JOIN usuario u ON t.profesional_ID = u.ID WHERE t.ID = ? AND t.paciente_ID = ?", [turnoId, user.id]);
 
         if (rows.length === 0) {
             logErrorToPage(`El turno con ID ${turnoId} no existe o no pertenece al usuario con email ${user.email}`);
@@ -399,7 +418,7 @@ router.put("/cancelarTurno", authMiddleware, async (req, res) => {
         }
 
         // Eliminar el turno de la base de datos
-        const [result] = await pool.query("UPDATE Turno SET estado = 'cancelado' WHERE id = ? AND paciente_ID = ?", [turnoId, user.id]);
+        const [result] = await pool.query("UPDATE turno SET estado = 'cancelado' WHERE id = ? AND paciente_ID = ?", [turnoId, user.id]);
         console.log(result);
         if (result.changedRows === 1) {
             logToPage(`Turno con ID ${turnoId} cancelado exitosamente para el usuario con email ${user.email}`);

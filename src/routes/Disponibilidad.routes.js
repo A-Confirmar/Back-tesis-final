@@ -62,7 +62,7 @@ import { authMiddleware } from "../middleware/auth.js";
 router.get("/obtenerDisponibilidadProfesional", authMiddleware, async (req, res) => {
     try {
         logToPage(`Buscando disponibilidad del profesional: ${req.query.email}`);
-        const [rows] = await pool.query("SELECT d.ID, u.nombre + u.apellido AS nombre, d.dia_semana, d.hora_inicio, d.hora_fin FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE u.email = ?", [req.query.email]);
+        const [rows] = await pool.query("SELECT d.ID, u.nombre + u.apellido AS nombre, d.dia_semana, d.hora_inicio, d.hora_fin FROM disponibilidad d JOIN usuario u ON d.profesional_ID = u.ID WHERE u.email = ?", [req.query.email]);
 
         if (rows.length === 0) {
             logErrorToPage("No se encontró disponibilidad para el profesional:", req.query.email);
@@ -202,32 +202,6 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
         const idProfesional = req.user.id;
 
         const { horarios } = req.body;
-        // const horarios = {
-        //     "lunes": [
-        //         { "inicio": "08:15", "fin": "20:00" },
-        //         { "inicio": "08:15", "fin": "20:00" }
-        //     ],
-        //     "martes": [
-        //         { "inicio": "08:15", "fin": "20:00" },
-        //         { "inicio": "08:15", "fin": "20:00" }
-        //     ],
-        //     "miercoles": [
-        //         { "inicio": "08:15", "fin": "20:00" },
-        //         { "inicio": "08:15", "fin": "20:00" }
-        //     ],
-        //     "jueves": [
-        //         { "inicio": "08:15", "fin": "20:00" },
-        //         { "inicio": "08:15", "fin": "20:00" }
-        //     ],
-        //     "viernes": [
-        //         { "inicio": "08:15", "fin": "20:00" },
-        //         { "inicio": "08:15", "fin": "20:00" }
-        //     ],
-        //     "sabado": [
-        //         { "inicio": "09:00", "fin": "14:00" }
-        //     ],
-        //     "domingo": null
-        // };
 
         if (!horarios) {
             logErrorToPage("No se proporcionaron horarios" + horarios);
@@ -252,11 +226,11 @@ router.post("/establecerDisponibilidadProfesional", authMiddleware, async (req, 
 
 
         await connection.query(
-            "DELETE FROM Disponibilidad WHERE profesional_ID = ?",
+            "DELETE FROM disponibilidad WHERE profesional_ID = ?",
             [idProfesional]
         );
         const [result] = await connection.query(
-            "INSERT INTO Disponibilidad (profesional_ID, dia_semana, hora_inicio, hora_fin) VALUES ?",
+            "INSERT INTO disponibilidad (profesional_ID, dia_semana, hora_inicio, hora_fin) VALUES ?",
             [values]
         );
 
@@ -331,7 +305,7 @@ router.get("/obtenerDisponibilidadDisponible", authMiddleware, async (req, res) 
             return res.status(400).json({ message: "No se proporciono email válido", result: false });
         }
         logToPage(`Buscando disponibilidad del profesional: ${email}`);
-        const [disponibilidad] = await pool.query("SELECT d.ID,d.dia_semana, d.hora_inicio, d.hora_fin FROM Disponibilidad d JOIN Usuario u ON d.profesional_ID = u.ID WHERE u.email = ?", [email]);
+        const [disponibilidad] = await pool.query("SELECT d.ID,d.dia_semana, d.hora_inicio, d.hora_fin FROM disponibilidad d JOIN usuario u ON d.profesional_ID = u.ID WHERE u.email = ?", [email]);
 
 
         if (disponibilidad.length === 0) {
@@ -342,7 +316,7 @@ router.get("/obtenerDisponibilidadDisponible", authMiddleware, async (req, res) 
         }
 
         logToPage("Buscando turnos RESERVADOS del profesional:" + email);
-        const [turnos] = await pool.query("SELECT t.fecha, t.hora_inicio, t.hora_fin FROM Turno t JOIN Usuario u ON t.profesional_ID = u.ID WHERE u.email = ? AND t.estado = 'pendiente'", [email]);
+        const [turnos] = await pool.query("SELECT t.fecha, t.hora_inicio, t.hora_fin FROM turno t JOIN usuario u ON t.profesional_ID = u.ID WHERE u.email = ? AND t.estado = 'pendiente'", [email]);
         logToPage(`Turnos reservados encontrados para el profesional.`);
 
 
@@ -380,10 +354,10 @@ router.get("/obtenerDisponibilidadDisponibleWalo", authMiddleware, async (req, r
         await pool.query("set lc_time_names = 'es_ES';");
         const [disponibilidad] = await pool.query(`SELECT tur.*,
                                                           dis.*
-                                                   FROM Turno tur
-                                                   LEFT JOIN Disponibilidad dis ON dis.profesional_ID = tur.profesional_ID
-                                                   WHERE tur.profesional_ID = (SELECT usu.ID 
-                                                                               FROM Usuario usu
+                                                   FROM turno tur
+                                                   LEFT JOIN disponibilidad dis ON dis.profesional_ID = tur.profesional_ID
+                                                   WHERE tur.profesional_ID = (SELECT usu.ID
+                                                                               FROM usuario usu
                                                                                WHERE usu.email = ${email})
                                                    AND NOT(LOWER(DAYNAME(tur.fecha)) = LOWER(dis.dia_semana) AND dis.hora_inicio = tur.hora_inicio AND dis.hora_fin = tur.hora_fin);`);
 

@@ -10,13 +10,57 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 import { uploadImage } from "../Utils/cloudinary.js";
 import fs from "fs"; // para borrar el archivo temporal
 import { upload } from "../Utils/multer.js";
-import { log } from "console";
 
-
+/**
+ * @swagger
+ * /obtenerListaDePacientesVinculados:
+ *   get:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Obtener lista de pacientes vinculados"
+ *     description: "Devuelve una lista de pacientes vinculados al profesional autenticado. Requiere autenticación."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     responses:
+ *       200:
+ *         description: "Lista de pacientes obtenida exitosamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Pacientes vinculados obtenidos"
+ *               data:
+ *                 - nombre: "Juan"
+ *                   apellido: "Pérez"
+ *                   email: "juan.perez@example.com"
+ *                   fecha_nacimiento: "1990-01-01"
+ *                   telefono: "123456789"
+ *                   localidad: "Ciudad"
+ *                   imagenPerfil: "https://example.com/image.jpg"
+ *               result: true
+ *       404:
+ *         description: "No se encontraron pacientes vinculados"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "No se encontraron pacientes vinculados"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Algo salió mal: error"
+ *               result: false
+ */
 router.get("/obtenerListaDePacientesVinculados", authMiddleware, async (req, res) => {
   try{
     const userId = req.user.id; // Obtener el ID del usuario del token
-    const [result] = await pool.query(`select u.nombre, u.apellido, u.email, u.fecha_nacimiento, u.telefono, u.localidad, u.imagenPerfil  from Turno t join Usuario u on u.ID = t.Paciente_ID where t.profesional_ID = ? group by u.ID`,
+    const [result] = await pool.query(`SELECT u.nombre, u.apellido, u.email, u.fecha_nacimiento, u.telefono, u.localidad, u.imagenPerfil  FROM turno t join usuario u on u.ID = t.Paciente_ID WHERE t.profesional_ID = ? GROUP BY u.ID`,
        [userId]);
     if (result.length === 0 ) {
       logErrorToPage("No se encontraron pacientes vinculados para el profesional con ID: ", userId);
@@ -94,7 +138,7 @@ router.post("/cargarImagenUsuario", authMiddleware, upload.single("imagen"), asy
 
     // Guardar la URL en la base de datos
     const [result] = await pool.query(
-      "UPDATE Usuario SET imagenPerfil = ? WHERE id = ?",
+      "UPDATE usuario SET imagenPerfil = ? WHERE id = ?",
       [imageUrl, userId]
     );
 
@@ -191,16 +235,18 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
     p.descripcion,
     p.calificacion_promedio,
     p.direccion,
+    p.valorConsulta,
+    pvalorConsultaExpress,
     CASE
     WHEN p.ID IS NOT NULL THEN 'profesional'
     WHEN pa.ID IS NOT NULL THEN 'paciente'
     WHEN a.ID IS NOT NULL THEN 'administrador'
     ELSE 'sin_rol'
     END AS rol
-    FROM Usuario u
-    LEFT JOIN Profesional p   ON u.ID = p.ID
-    LEFT JOIN Paciente pa     ON u.ID = pa.ID
-    LEFT JOIN Administrador a ON u.ID = a.ID
+    FROM usuario u
+    LEFT JOIN profesional p   ON u.ID = p.ID
+    LEFT JOIN paciente pa     ON u.ID = pa.ID
+    LEFT JOIN administrador a ON u.ID = a.ID
     WHERE u.ID = ?;
     `;
 
@@ -277,7 +323,7 @@ router.post("/logIn", async (req, res) => {
     const { email, password } = req.body;
 
     await pool.query(`set lc_time_names = 'es_ES'`);
-    const [rows] = await pool.query(`SELECT id, email, password, nombre FROM Usuario WHERE email = ?`, [email]);
+    const [rows] = await pool.query(`SELECT id, email, password, nombre FROM usuario WHERE email = ?`, [email]);
 
     if (rows.length === 0) {
       logErrorToPage("Usuario no encontrado con email: ", email);
@@ -295,15 +341,8 @@ router.post("/logIn", async (req, res) => {
       email: rows[0].email,
       name: rows[0].nombre
     }, config.SECRETO, { expiresIn: "1h" });
-    console.log("Token nombre: ", rows[0].nombre);
+    logToPage("Bienvenido: "+ rows[0].nombre);
 
-    // Guardar un token JWT en una cookie
-    // res.cookie('token', token, {
-    //   httpOnly: true,      // Solo accesible por el backend (recomendado para JWT)
-    //   secure: true,        // Solo se envía por HTTPS (en producción)
-    //   sameSite: 'strict',  // Protección CSRF
-    //   maxAge: 60 * 60 * 1000 // 1 hora en milisegundos
-    // });
 
     logToPage("Usuario logueado correctamente: " + email);
     return res.status(200).json({ token: token, message: "Usuario logueado", result: true })
@@ -350,8 +389,6 @@ router.post("/logIn", async (req, res) => {
  *                 type: string
  *               descripcion:
  *                 type: string
- *               calificacionPromedio:
- *                 type: number
  *               direccion:
  *                 type: string
  *           examples:
@@ -367,7 +404,6 @@ router.post("/logIn", async (req, res) => {
  *                 rol: "profesional"
  *                 especialidad: "Cardiología"
  *                 descripcion: "Médica cardióloga con 10 años de experiencia"
- *                 calificacionPromedio: 4.5
  *                 direccion: "Rio Negro 2170"
  *             paciente:
  *               summary: "Ejemplo de registro de paciente"
@@ -418,9 +454,10 @@ router.post("/register", async (req, res) => {
   const connection = await pool.getConnection();
   //chequeo de que el email no esté ya en uso
   try {
-    const { email, password, nombre, apellido, fecha_nacimiento, telefono, rol, localidad, especialidad, descripcion, calificacionPromedio, direccion } = req.body;
+    const { email, password, nombre, apellido, fecha_nacimiento, telefono, rol, localidad, especialidad, descripcion, direccion } = req.body;
 
-    const [resultSelect] = await connection.query("SELECT * FROM Usuario WHERE email = ?", [email]);
+    const [resultSelect] = await connection.query("SELECT * FROM usuario WHERE email = ?", [email]);
+
     if (resultSelect.length > 0) {
       logErrorToPage("Email ya en uso: " + email);
       return res.status(400).json({ message: "El email ya está en uso", result: false }); //mail repetido
@@ -443,24 +480,24 @@ router.post("/register", async (req, res) => {
     await connection.beginTransaction();
 
     const [result] = await connection.query(
-      "INSERT INTO Usuario (nombre, email, password, apellido, fecha_nacimiento, telefono, localidad) VALUES (?, ?, ?, ?, ?, ?, ?)", [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad] // almaceno la contraseña hasheada
+      "INSERT INTO usuario (nombre, email, password, apellido, fecha_nacimiento, telefono, localidad) VALUES (?, ?, ?, ?, ?, ?, ?)", [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad] // almaceno la contraseña hasheada
     );
 
     const usuarioId = result.insertId;
 
     if (rol === "profesional") {
       await connection.query(
-        "INSERT INTO Profesional (ID, especialidad, descripcion, calificacion_promedio, direccion) VALUES (?, ?, ?, ?, ?)",
-        [usuarioId, especialidad, descripcion, calificacionPromedio || 0, direccion]
+        "INSERT INTO profesional (ID, especialidad, descripcion, direccion) VALUES (?, ?, ?, ?)",
+        [usuarioId, especialidad, descripcion, direccion]
       );
     } else if (rol === "paciente") {
       await connection.query(
-        "INSERT INTO Paciente (ID) VALUES (?)",
+        "INSERT INTO paciente (ID) VALUES (?)",
         [usuarioId]
       );
     } else if (rol === "admin") {
       await connection.query(
-        "INSERT INTO Administrador (ID) VALUES (?)",
+        "INSERT INTO administrador (ID) VALUES (?)",
         [usuarioId]
       );
     } else {
@@ -572,7 +609,7 @@ router.put("/update", authMiddleware, async (req, res) => {
     }, config.SECRETO, { expiresIn: "1h" });
 
     const [result] = await pool.query(
-      "UPDATE Usuario SET nombre = ?, email = ?, password = ?, apellido = ?, fecha_nacimiento = ?, telefono = ?, localidad = ? WHERE email = ?",
+      "UPDATE usuario SET nombre = ?, email = ?, password = ?, apellido = ?, fecha_nacimiento = ?, telefono = ?, localidad = ? WHERE email = ?",
       [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad, req.user.email]
     );
     if (result.affectedRows === 0) {
@@ -631,7 +668,7 @@ router.put("/update", authMiddleware, async (req, res) => {
 router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
   try {
     logToPage("Intentando eliminar usuario: ", req.user.email);
-    const [result] = await pool.query("DELETE FROM Usuario WHERE email = ?", [req.user.email]);
+    const [result] = await pool.query("DELETE FROM usuario WHERE email = ?", [req.user.email]);
     if (result.affectedRows === 0) {
       logErrorToPage("Usuario no encontrado: ", req.user.email);
       return res
@@ -727,7 +764,7 @@ router.get("/buscarProfesional", authMiddleware, async (req, res) => {
     //   return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
     // }
 
-    const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion FROM Profesional p JOIN Usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%` + " || *", `%${leyenda}%`]);
+    const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion, p.valorConsulta, p.valorConsultaExpress FROM profesional p JOIN usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%` + " || *", `%${leyenda}%`]);
     if (result.length === 0) {
       logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
       return res.status(404).json({ message: "No se encontraron profesionales", result: false });
@@ -837,7 +874,7 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
     const email = req.user.email;
 
     // Verificar que el usuario existe
-    const [rows] = await pool.query("SELECT id FROM Usuario WHERE email = ?", [email]);
+    const [rows] = await pool.query("SELECT id FROM usuario WHERE email = ?", [email]);
     if (rows.length === 0) {
       logErrorToPage("Usuario no encontrado con email: " + email);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
@@ -848,7 +885,7 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
     const hashedPassword = await bcrypt.hashSync(newPassword, Number(config.SALT));
 
     // Actualizar la contraseña
-    await pool.query("UPDATE Usuario SET password = ? WHERE email = ?", [hashedPassword, email]);
+    await pool.query("UPDATE usuario SET password = ? WHERE email = ?", [hashedPassword, email]);
 
     logToPage("Contraseña actualizada exitosamente para: ", email);
     return res.status(200).json({ message: "Contraseña actualizada exitosamente", result: true });
@@ -857,6 +894,94 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
     logErrorToPage("Error en /cambiarClave: ", error);
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
   }
+});
+
+/**
+ * @swagger
+ * /ActualizarValorConsultas:
+ *   put:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Actualizar valores de consulta"
+ *     description: "Permite a un profesional actualizar los valores de consulta estándar y express. Requiere autenticación."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               valorConsulta:
+ *                 type: number
+ *                 example: 500
+ *                 description: "Nuevo valor de la consulta estándar"
+ *               valorConsultaExpress:
+ *                 type: number
+ *                 example: 700
+ *                 description: "Nuevo valor de la consulta express"
+ *     responses:
+ *       200:
+ *         description: "Valores de consulta actualizados correctamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Valor de consulta actualizado correctamente."
+ *               result: true
+ *       400:
+ *         description: "Faltan datos obligatorios"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Faltan datos obligatorios"
+ *               result: false
+ *       404:
+ *         description: "Profesional no encontrado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Profesional no encontrado"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error al actualizar el valor de consulta."
+ *               result: false
+ */
+router.put("/ActualizarValorConsultas", authMiddleware, async (req, res) => {
+    try{
+        const { valorConsulta, valorConsultaExpress } = req.body;
+
+        if(!valorConsulta || !valorConsultaExpress){
+            logErrorToPage(`Faltan datos obligatorios para actualizar el valor de consulta.`);
+            return  res.status(400).json({ message: "Faltan datos obligatorios.", result: false });
+        }
+
+        const [result] =  await pool.query(
+            "UPDATE profesional SET valorConsulta = ?, valorConsultaExpress = ? WHERE ID = ?",
+            [valorConsulta, valorConsultaExpress, req.user.id]
+        );
+
+        if(result.affectedRows === 0){
+            logErrorToPage(`Profesional no encontrado para actualizar el valor de consulta: `, req.user.id);
+            return res.status(404).json({ message: "Profesional no encontrado.", result: false });
+        }
+
+        logToPage(`Valor de consulta actualizado para el profesional: `, req.user.id);
+        res.status(200).json({ message: "Valor de consulta actualizado correctamente.", result: true });
+
+    }catch(error){
+        logErrorToPage(`Error al actualizar el valor de consulta.`);
+        res.status(500).json({ message: "Error al actualizar el valor de consulta." + error.message, result: false });
+    }
 });
 
 export default router;

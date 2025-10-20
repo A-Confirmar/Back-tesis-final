@@ -55,8 +55,8 @@ router.get("/verBloqueados", authMiddleware,  async (req, res) => {
         const userId = req.user.id;
         const [bloqueados] = await pool.query(
             `SELECT U.ID, U.nombre, U.apellido, U.email, B.motivo, B.fecha 
-             FROM Bloqueo B 
-             JOIN Usuario U ON B.paciente_ID = U.ID 
+             FROM bloqueo B 
+             JOIN usuario U ON B.paciente_ID = U.ID 
              WHERE B.profesional_ID = ?`,
             [userId]
         );
@@ -112,8 +112,8 @@ router.get("/verProfesionalesQueMeTienenBloqueado", authMiddleware, async (req, 
         const userId = req.user.id;
         const [bloqueados] = await pool.query(
             `SELECT U.ID, U.nombre, U.apellido, U.email, B.motivo, B.fecha 
-             FROM Bloqueo B 
-             JOIN Usuario U ON B.profesional_ID = U.ID 
+             FROM bloqueo B 
+             JOIN usuario U ON B.profesional_ID = U.ID 
              WHERE B.paciente_ID = ?`,
             [userId]
         );
@@ -191,7 +191,7 @@ router.post("/bloquearUsuario", authMiddleware, async (req, res) => {
             logErrorToPage("Falta el email del paciente a bloquear");
             return res.status(400).json({ message: "Falta el email del paciente a bloquear", result: false });
         }
-        const [rows] = await pool.query("SELECT * from Usuario WHERE email = ?", [emailPaciente]);
+        const [rows] = await pool.query("SELECT * from usuario WHERE email = ?", [emailPaciente]);
         if (rows.length === 0) {
             logErrorToPage("Usuario a bloquear no encontrado");
             return res.status(404).json({ message: "Usuario a bloquear no encontrado", result: false });
@@ -200,7 +200,7 @@ router.post("/bloquearUsuario", authMiddleware, async (req, res) => {
 
         // Verificar si ya está bloqueado
         const [bloqueoExistente] = await pool.query(
-            "SELECT * FROM Bloqueo WHERE profesional_ID = ? AND paciente_ID = ?",
+            "SELECT * FROM bloqueo WHERE profesional_ID = ? AND paciente_ID = ?",
             [userId, pacienteId]
         );
         if (bloqueoExistente.length > 0) {
@@ -208,7 +208,7 @@ router.post("/bloquearUsuario", authMiddleware, async (req, res) => {
             return res.status(400).json({ message: "El usuario ya está bloqueado por este profesional", result: false });
         }
         await pool.query(
-            "INSERT INTO Bloqueo (profesional_ID, paciente_ID,motivo,fecha) VALUES (?, ?, ?, ?)",
+            "INSERT INTO bloqueo (profesional_ID, paciente_ID,motivo,fecha) VALUES (?, ?, ?, ?)",
             [userId, pacienteId, motivo, new Date()]
         );
         logToPage(`Usuario con email ${emailPaciente} bloqueado por profesional ID ${userId}`);
@@ -278,14 +278,14 @@ router.delete("/desbloquearUsuario", authMiddleware, async (req, res) => {
             return res.status(400).json({ message: "Falta el email del paciente a desbloquear", result: false });
         }
 
-        const [paciente] = await pool.query("SELECT * from Usuario WHERE email = ?", [emailPaciente]);
+        const [paciente] = await pool.query("SELECT * from usuario WHERE email = ?", [emailPaciente]);
         
         if (paciente.length === 0) {
             logErrorToPage("Usuario a desbloquear no encontrado");
             return res.status(404).json({ message: "Usuario a desbloquear no encontrado", result: false });
         }
-        
-        const [pacienteBloqueado] = await pool.query("SELECT * from Bloqueo WHERE paciente_ID = ?", [paciente[0].ID]);
+
+        const [pacienteBloqueado] = await pool.query("SELECT * from bloqueo WHERE paciente_ID = ?", [paciente[0].ID]);
         console.log(paciente);
         
         if(pacienteBloqueado.length === 0){
@@ -295,7 +295,7 @@ router.delete("/desbloquearUsuario", authMiddleware, async (req, res) => {
 
         const pacienteId = paciente[0].ID;
         await pool.query(
-            "DELETE FROM Bloqueo WHERE profesional_ID = ? AND paciente_ID = ?",
+            "DELETE FROM bloqueo WHERE profesional_ID = ? AND paciente_ID = ?",
             [userId, pacienteId]
         );
         logToPage(`Usuario con email ${emailPaciente} desbloqueado por profesional ID ${userId}`);

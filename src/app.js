@@ -6,10 +6,13 @@ import mailroutes from "./routes/mail.routes.js";
 import disponibilidadRoutes from "./routes/Disponibilidad.routes.js";
 import turnosRoutes from "./routes/turnos.routes.js";
 import bloqueoRoutes from "./routes/Bloqueo.routes.js";
+import pagosRoutes from "./routes/pagos.routes.js";
+import reseniasRoutes from "./routes/reseña.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import {cargarRecordatoriosPendientes} from "./Utils/recordatorios.js";
 
 
 
@@ -52,8 +55,11 @@ app.use(mailroutes)
 app.use(disponibilidadRoutes)
 app.use(turnosRoutes)
 app.use(bloqueoRoutes);
+app.use(pagosRoutes);
+app.use(reseniasRoutes);
 app.use(express.json({ limit: "10mb" })); // <- aumentá a lo que necesites
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+cargarRecordatoriosPendientes();
 
 
 //configuracion
