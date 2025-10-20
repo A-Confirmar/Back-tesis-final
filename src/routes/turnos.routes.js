@@ -201,48 +201,45 @@ router.get("/obtenerMisTurnosPendientes", authMiddleware, async (req, res) => {
  *     tags:
  *       - CRUD Turnos
  *     summary: "Crear nuevo turno, pago y programa recordatorio 1 hora antes de la hora de inicio"
- *     description: "Crea un nuevo turno y pago en el sistema .(requiere autenticación) Y generar recordatorio una hora antes"
+ *     description: "Crea un nuevo turno y pago en el sistema. Requiere autenticación. Además, genera un recordatorio una hora antes del inicio del turno."
  *     security:
  *       - bearerAuth: []
- *     parameters:
+ *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             required:
- *               - token
  *               - emailProfesional
  *               - fecha
  *               - hora_inicio
  *               - hora_fin
- *               - estado
  *               - tipo
  *             properties:
- *               token:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *               emailProfesional:
  *                 type: string
  *                 example: "doctor@mail.com"
+ *                 description: "Correo electrónico del profesional"
  *               fecha:
  *                 type: string
  *                 format: date
  *                 example: "2025-10-03"
+ *                 description: "Fecha del turno (YYYY-MM-DD)"
  *               hora_inicio:
  *                 type: string
  *                 format: time
  *                 example: "09:00"
+ *                 description: "Hora de inicio del turno (HH:mm)"
  *               hora_fin:
  *                 type: string
  *                 format: time
  *                 example: "09:30"
- *               estado:
- *                 type: string
- *                 example: "pendiente"
+ *                 description: "Hora de finalización del turno (HH:mm)"
  *               tipo:
  *                 type: string
  *                 example: "consulta"
+ *                 description: "Tipo de turno (consulta, control, etc.)"
  *     responses:
  *       201:
  *         description: "Turno creado exitosamente"
