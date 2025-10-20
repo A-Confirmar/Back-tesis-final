@@ -297,8 +297,8 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
             idProfesional = result[0].profesional_ID;
             logToPage(`Verificando si ya existe un turno para el profesional con email ${emailProfesional} el ${fecha} de ${hora_inicio} a ${hora_fin}`);
             [turnoExistente] = await pool.query(
-                "SELECT * FROM turno t JOIN usuario u ON u.ID = t.profesional_ID WHERE u.email = ? AND fecha = ?AND (? = t.hora_fin AND? = t.hora_inicio)",
-                [emailProfesional, fecha, hora_inicio, hora_fin]
+                "SELECT * FROM turno t JOIN usuario u ON u.ID = t.profesional_ID WHERE u.email = ? AND fecha = ? AND (? = t.hora_fin AND ? = t.hora_inicio)",
+                [emailProfesional, fecha, hora_fin, hora_inicio]
             );
         } else {
             logErrorToPage(`El profesional con email ${emailProfesional} no tiene disponibilidad el ${diaSemana} de ${hora_inicio} a ${hora_fin}`);
@@ -307,6 +307,7 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
                 result: false
             });
         }
+
 
         if (turnoExistente.length > 0) {
             logErrorToPage(`Ya existe un turno para el profesional con email ${emailProfesional} el ${fecha} de ${hora_inicio} a ${hora_fin}`);
