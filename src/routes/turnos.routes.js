@@ -329,7 +329,7 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
 
             logToPage("Generando pago relacionado al turno en PENDIENTE.")
 
-            const [pago] = await conexión.query("INSERT INTO pago (turno_ID, monto, estado) VALUES (?,(SELECT valorConsulta FROM profesional WHERE ID = ?), 'pendiente')", [reserva.insertId, idProfesional]);
+            const [pago] = await conexión.query("INSERT INTO pago (turno_ID, monto, estado, fecha) VALUES (?,(SELECT valorConsulta FROM profesional WHERE ID = ?), 'pendiente', ?)", [reserva.insertId, idProfesional, fecha]);
 
             if (pago.affectedRows === 1) {
                 logToPage(`Pago generado exitosamente con ID ${pago.insertId}`);
