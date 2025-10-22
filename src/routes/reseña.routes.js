@@ -125,6 +125,70 @@ router.get("/verTodasMisResenias", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
+ * /tieneResenia:
+ *   get:
+ *     tags:
+ *       - CRUD Reseñas
+ *     summary: "Devuelve un true si el usuario ya hizo la reseña al turno relacionado"
+ *     description: "Verifica si el usuario autenticado ya ha realizado una reseña para el turno especificado."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       - name: idTurno
+ *         in: body
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "123"
+ *     responses:
+ *       200:
+ *         description: "Respuesta exitosa"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Mis reseñas obtenidas exitosamente"
+ *               result: true
+ *       400:
+ *        description: "Error en los datos enviados"
+ *        content:
+ *          application/json:
+ *            example:
+ *              message: "Faltan datos obligatorios para crear la reseña"
+ *              result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error al obtener mis reseñas."
+ *               error: "Error detallado"
+ *               result: false
+ */
+router.get("/tieneResenia", authMiddleware, async (req, res) => {
+    try {
+        logToPage("Verificando si el usuario tiene reseña...");
+        const { idTurno } = req.body;
+        if (!idTurno) {
+            return res.status(400).json({ message: "Faltan datos obligatorios para verificar la reseña", result: false });
+        }
+        const [turnoExiste] = await pool.query("SELECT * FROM turno WHERE ID = ?", [idTurno]);
+        if (turnoExiste.length === 0) {
+            return res.status(400).json({ message: "El turno especificado no existe", result: false });
+        }
+        const [result] = await pool.query("SELECT COUNT(*) as tieneResenia FROM reseña r JOIN turno t ON r.turno_ID = t.ID WHERE t.ID = ? AND t.paciente_ID = ?", [idTurno, req.user.id]);
+        res.status(200).json({ message: "Verificación de reseña exitosa", result: result[0].tieneResenia > 0 });
+    } catch (error) {
+        logErrorToPage("❌ Error interno:" + error);
+        res.status(500).json({ message: "Error al verificar la reseña.", error: error.message, result: false });
+    }
+});
+
+/**
+ * @swagger
  * /crearResenia:
  *   post:
  *     tags:
@@ -225,7 +289,7 @@ router.post("/crearResenia", authMiddleware, async (req, res) => {
         const [promedio] = await conexion.query("SELECT AVG(puntaje) AS promedio FROM reseña WHERE profesional_ID = (SELECT profesional_ID FROM turno WHERE ID = ?)", [turnoID]);
         const [resultCalificacion] = await conexion.query("UPDATE profesional SET calificacion_promedio = ? WHERE ID = (SELECT profesional_ID FROM turno WHERE ID = ?)", [promedio[0].promedio, turnoID]);
 
-        if(resultCalificacion.affectedRows === 0){
+        if (resultCalificacion.affectedRows === 0) {
             logErrorToPage("❌ Error al actualizar la calificación promedio del profesional");
             await conexion.rollback();
             return res.status(400).json({ message: "Error al actualizar la calificación promedio del profesional", result: false });
@@ -322,8 +386,6 @@ router.put("/aprobarResenia", authMiddleware, async (req, res) => {
         res.status(500).json({ message: "Error al aprobar la reseña.", error: error.message });
     }
 });
-
-
 
 /**
  * @swagger
