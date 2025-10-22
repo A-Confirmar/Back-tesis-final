@@ -139,7 +139,7 @@ router.get("/verTodasMisResenias", authMiddleware, async (req, res) => {
  *           type: string
  *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *       - name: idTurno
- *         in: body
+ *         in: query
  *         required: true
  *         schema:
  *           type: string
@@ -171,7 +171,7 @@ router.get("/verTodasMisResenias", authMiddleware, async (req, res) => {
 router.get("/tieneResenia", authMiddleware, async (req, res) => {
     try {
         logToPage("Verificando si el usuario tiene reseña...");
-        const { idTurno } = req.body;
+        const { idTurno } = req.query;
         if (!idTurno) {
             return res.status(400).json({ message: "Faltan datos obligatorios para verificar la reseña", result: false });
         }
