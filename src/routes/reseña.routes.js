@@ -125,87 +125,6 @@ router.get("/verTodasMisResenias", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
- * /aprobarResenia:
- *   put:
- *     tags:
- *       - CRUD Reseñas
- *     summary: "Aprobar una reseña"
- *     description: "Permite a un administrador aprobar una reseña para que sea visible."
- *     parameters:
- *       - name: token
- *         in: header
- *         required: true
- *         schema:
- *           type: string
- *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               reseniaID:
- *                 type: integer
- *                 example: 1
- *                 description: "ID de la reseña a aprobar"
- *     responses:
- *       200:
- *         description: "Reseña aprobada exitosamente"
- *         content:
- *           application/json:
- *             example:
- *               message: "Reseña aprobada exitosamente"
- *               result: true
- *       403:
- *         description: "Acceso denegado"
- *         content:
- *           application/json:
- *             example:
- *               message: "Solo los administradores pueden aprobar reseñas."
- *               result: false
- *       404:
- *         description: "Reseña no encontrada"
- *         content:
- *           application/json:
- *             example:
- *               message: "Reseña no encontrada"
- *               result: false
- *       500:
- *         description: "Error interno del servidor"
- *         content:
- *           application/json:
- *             example:
- *               message: "Error al aprobar la reseña."
- *               error: "Error detallado"
- */
-router.put("/aprobarResenia", authMiddleware, async (req, res) => {
-    const { reseniaID } = req.body;
-    try {
-        const [esAdmin] = await pool.query("SELECT u.ID FROM usuario u JOIN administrador a ON u.ID = a.ID WHERE u.ID = ?", [req.user.id]);
-
-        if (esAdmin.length > 0) {
-            logToPage("El usuario es administrador. modificando la reseña...");
-            const [resenia] = await pool.query("UPDATE reseña SET estado = 'visible' WHERE ID = ?", [reseniaID]);
-            if (resenia.affectedRows > 0) {
-                res.status(200).json({ message: "Reseña aprobada exitosamente", result: true });
-            } else {
-                res.status(404).json({ message: "Reseña no encontrada", result: false });
-            }
-
-        } else {
-            logErrorToPage("❌ Error al modificar la reseña: Solo los administradores pueden aprobar reseñas");
-            res.status(403).json({ message: "Solo los administradores pueden aprobar reseñas.", result: false });
-        }
-
-    } catch (error) {
-        logErrorToPage("❌ Error al aprobar la reseña:" + error);
-        res.status(500).json({ message: "Error al aprobar la reseña.", error: error.message });
-    }
-});
-
-/**
- * @swagger
  * /crearResenia:
  *   post:
  *     tags:
@@ -322,6 +241,89 @@ router.post("/crearResenia", authMiddleware, async (req, res) => {
         conexion.release();
     }
 });
+
+/**
+ * @swagger
+ * /aprobarResenia:
+ *   put:
+ *     tags:
+ *       - CRUD Reseñas
+ *     summary: "Aprobar una reseña"
+ *     description: "Permite a un administrador aprobar una reseña para que sea visible."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reseniaID:
+ *                 type: integer
+ *                 example: 1
+ *                 description: "ID de la reseña a aprobar"
+ *     responses:
+ *       200:
+ *         description: "Reseña aprobada exitosamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Reseña aprobada exitosamente"
+ *               result: true
+ *       403:
+ *         description: "Acceso denegado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Solo los administradores pueden aprobar reseñas."
+ *               result: false
+ *       404:
+ *         description: "Reseña no encontrada"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Reseña no encontrada"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error al aprobar la reseña."
+ *               error: "Error detallado"
+ */
+router.put("/aprobarResenia", authMiddleware, async (req, res) => {
+    const { reseniaID } = req.body;
+    try {
+        const [esAdmin] = await pool.query("SELECT u.ID FROM usuario u JOIN administrador a ON u.ID = a.ID WHERE u.ID = ?", [req.user.id]);
+
+        if (esAdmin.length > 0) {
+            logToPage("El usuario es administrador. modificando la reseña...");
+            const [resenia] = await pool.query("UPDATE reseña SET estado = 'visible' WHERE ID = ?", [reseniaID]);
+            if (resenia.affectedRows > 0) {
+                res.status(200).json({ message: "Reseña aprobada exitosamente", result: true });
+            } else {
+                res.status(404).json({ message: "Reseña no encontrada", result: false });
+            }
+
+        } else {
+            logErrorToPage("❌ Error al modificar la reseña: Solo los administradores pueden aprobar reseñas");
+            res.status(403).json({ message: "Solo los administradores pueden aprobar reseñas.", result: false });
+        }
+
+    } catch (error) {
+        logErrorToPage("❌ Error al aprobar la reseña:" + error);
+        res.status(500).json({ message: "Error al aprobar la reseña.", error: error.message });
+    }
+});
+
+
 
 /**
  * @swagger

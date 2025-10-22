@@ -109,3 +109,37 @@ export async function enviarMailCancelacionTurno(to, nombrePaciente, nombreProfe
   </div>${footer}`
   });
 }
+
+
+// Función para enviar mail CANCELACION de turno
+export async function enviarMailSolicitudExpress(to, nombrePaciente, profesionalRows) {
+  return transporter.sendMail({
+      from: '"MediTurnos" <MediTurnos@gmail.com>',
+      to,
+      subject: `SOLICITUD DE TURNO EXPRESS CON ${nombrePaciente}`, 
+      html: `${header}<div style="padding:32px 24px; font-family:'Segoe UI',Arial,sans-serif; color:#222;">
+      <div style="margin-bottom:16px; text-align:center; font-size:18px;">
+          <b>Hola ${profesionalRows.nombre} ${profesionalRows.apellido}, ${nombrePaciente} ha solicitado un turno express con usted.</b> <br/>
+          <b>Por favor, revise su agenda para confirmar o denegar la solicitud.</b> <br/>
+          <a href="https://medi-turnos-front.vercel.app/" style="color: #FFFFFF; border:1px solid #1a73e8; padding:8px 12px; text-decoration:none; border-radius:4px; margin-top:12px; display:inline-block; background-color: #0432ffff;">Ver agenda</a> <br/>
+          <b>En caso de confirmar el turno, recuerde cambiar el estado del turno manualmente en la plataforma al finalizar la sesion.</b>
+      </div>
+  </div>${footer}`
+  });
+}
+
+
+// Función para enviar mail CANCELACION de turno
+export async function enviarMailConfirmacionTurnoExpress(to, nombrePaciente, nombreProfesional) {
+  return transporter.sendMail({
+      from: '"MediTurnos" <MediTurnos@gmail.com>',
+      to,
+      subject: `CONFIRMACIÓN DE TURNO EXPRESS CON ${nombreProfesional}`, 
+      html: `${header}<div style="padding:32px 24px; font-family:'Segoe UI',Arial,sans-serif; color:#222;">
+      <div style="margin-bottom:16px; text-align:center; font-size:18px;">
+          <b>Hola ${nombrePaciente}, su turno express ha sido confirmado con el profesional ${nombreProfesional} ahora mismo.</b> <br/>
+
+      </div>
+  </div>${footer}`
+  });
+}

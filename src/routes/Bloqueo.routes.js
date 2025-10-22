@@ -6,12 +6,6 @@ import { authMiddleware } from "../middleware/auth.js";
 import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 
 
-
-
-
-
-
-
 /**
  * @swagger
  * /verBloqueados:

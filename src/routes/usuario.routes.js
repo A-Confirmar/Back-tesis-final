@@ -80,84 +80,6 @@ router.get("/obtenerListaDePacientesVinculados", authMiddleware, async (req, res
 
 /**
  * @swagger
- * /cargarImagenUsuario:
- *   post:
- *     tags:
- *       - CRUD Usuarios
- *     summary: "Subir imagen de perfil del usuario"
- *     description: "Permite subir una imagen de perfil en formato PNG para el usuario autenticado."
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               imagen:
- *                 type: string
- *                 format: binary
- *                 description: "Archivo de imagen en formato PNG"
- *     responses:
- *       200:
- *         description: "Imagen cargada exitosamente"
- *         content:
- *           application/json:
- *             example:
- *               imagenUrl: "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
- *               message: "Imagen cargada exitosamente"
- *               result: true
- *       400:
- *         description: "Error al subir la imagen"
- *         content:
- *           application/json:
- *             example:
- *               message: "No se proporcionó ninguna imagen"
- *               result: false
- *       401:
- *         description: "Token inválido o no enviado"
- *         content:
- *           application/json:
- *             example:
- *               message: "Token requerido"
- *               result: false
- *       500:
- *         description: "Error interno del servidor"
- *         content:
- *           application/json:
- *             example:
- *               message: "Algo salió mal: error"
- *               result: false
- */
-router.post("/cargarImagenUsuario", authMiddleware, upload.single("imagen"), async (req, res) => {
-  try {
-    const userId = req.user.id; // Obtener el ID del usuario autenticado
-
-    // Subir la imagen a Cloudinary
-    const imageUrl = await uploadImage(`./assets/images/perfil.png`, `usuario_${userId}`);
-    logToPage("Imagen subida a Cloudinary: " + imageUrl);
-
-    // Guardar la URL en la base de datos
-    const [result] = await pool.query(
-      "UPDATE usuario SET imagenPerfil = ? WHERE id = ?",
-      [imageUrl, userId]
-    );
-
-    if (result.affectedRows === 0) {
-      logErrorToPage("Usuario no encontrado para cargar imagen: ", userId);
-      res.status(404).json({ message: "Usuario no encontrado", result: false });
-    }
-
-    // Borrar el archivo temporal
-    fs.unlinkSync("./assets/images/perfil.png");
-
-    res.json({ message: "Imagen cargada exitosamente", imageUrl: imageUrl, result: true });
-  } catch (error) {
-    res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
-  }
-});
-
-/**
- * @swagger
  * /obtenerUsuario:
  *   get:
  *     tags:
@@ -263,6 +185,175 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
     res.status(200).json({ user: result[0], result: true });
   } catch (error) {
     return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
+  }
+});
+
+/**
+ * @swagger
+ * /buscarProfesional:
+ *   get:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Buscar profesionales"
+ *     description: "Busca profesionales por nombre o especialidad. Si no se pone nada en leyenda, trae todos los profesionales."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       - name: leyenda
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: "psicologo"
+ *     responses:
+ *       200:
+ *         description: "Profesionales encontrados"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Profesionales encontrados"
+ *               result: true
+ *               data:
+ *                 - nombre: "German"
+ *                   apellido: "Lopez"
+ *                   email: "german.lopez@example.com"
+ *                   localidad: "Argentina"
+ *                   especialidad: "psicologo"
+ *                   descripcion: "Soy un re psicologo"
+ *                   calificacion_promedio: "7.00"
+ *                   direccion: "Calle Falsa 123"
+ *                 - nombre: "Roma"
+ *                   apellido: "Gonzalez"
+ *                   email: "roma.gonzalez@example.com"
+ *                   localidad: "Argentina"
+ *                   especialidad: "Medica"
+ *                   descripcion: "Soy una re medica"
+ *                   calificacion_promedio: "9.00"
+ *                   direccion: "Avenida Siempre Viva 742"
+ *       404:
+ *         description: "No se encontraron profesionales"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "No se encontraron profesionales"
+ *               result: false
+ *       400:
+ *         description: "Falta la leyenda del profesional"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Falta la leyenda del profesional"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Algo salió mal: error"
+ *               result: false
+ */
+router.get("/buscarProfesional", authMiddleware, async (req, res) => {
+  try {
+    const { leyenda } = req.query;
+
+    // if (!leyenda) {
+    //   logErrorToPage("Falta la leyenda del profesional en la búsqueda🧟‍♂️");
+    //   return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
+    // }
+
+    const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion, p.valorConsulta, p.valorConsultaExpress FROM profesional p JOIN usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%` + " || *", `%${leyenda}%`]);
+    if (result.length === 0) {
+      logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
+      return res.status(404).json({ message: "No se encontraron profesionales", result: false });
+    }
+
+    logToPage("Profesionales encontrados para la leyenda: ", leyenda);
+    res.status(200).json({ message: "Profesionales encontrados", result: true, data: result });
+  } catch (error) {
+    logErrorToPage("Error en /buscarProfesional: ", error);
+    return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
+  }
+});
+
+/**
+ * @swagger
+ * /cargarImagenUsuario:
+ *   post:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Subir imagen de perfil del usuario"
+ *     description: "Permite subir una imagen de perfil en formato PNG para el usuario autenticado."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               imagen:
+ *                 type: string
+ *                 format: binary
+ *                 description: "Archivo de imagen en formato PNG"
+ *     responses:
+ *       200:
+ *         description: "Imagen cargada exitosamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               imagenUrl: "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
+ *               message: "Imagen cargada exitosamente"
+ *               result: true
+ *       400:
+ *         description: "Error al subir la imagen"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "No se proporcionó ninguna imagen"
+ *               result: false
+ *       401:
+ *         description: "Token inválido o no enviado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Token requerido"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Algo salió mal: error"
+ *               result: false
+ */
+router.post("/cargarImagenUsuario", authMiddleware, upload.single("imagen"), async (req, res) => {
+  try {
+    const userId = req.user.id; // Obtener el ID del usuario autenticado
+
+    // Subir la imagen a Cloudinary
+    const imageUrl = await uploadImage(`./assets/images/perfil.png`, `usuario_${userId}`);
+    logToPage("Imagen subida a Cloudinary: " + imageUrl);
+
+    // Guardar la URL en la base de datos
+    const [result] = await pool.query(
+      "UPDATE usuario SET imagenPerfil = ? WHERE id = ?",
+      [imageUrl, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      logErrorToPage("Usuario no encontrado para cargar imagen: ", userId);
+      res.status(404).json({ message: "Usuario no encontrado", result: false });
+    }
+
+    // Borrar el archivo temporal
+    fs.unlinkSync("./assets/images/perfil.png");
+
+    res.json({ message: "Imagen cargada exitosamente", imageUrl: imageUrl, result: true });
+  } catch (error) {
+    res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
   }
 });
 
@@ -519,267 +610,6 @@ router.post("/register", async (req, res) => {
 
 /**
  * @swagger
- * /update:
- *   put:
- *     tags:
- *       - CRUD Usuarios
- *     summary: "Actualizar un usuario"
- *     description: "Actualiza los datos del usuario autenticado. Requiere autenticación."
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *               nombre:
- *                 type: string
- *                 example: "Juan"
- *               email:
- *                 type: string
- *                 example: "juan@mail.com"
- *               password:
- *                 type: string
- *                 example: "123456"
- *               apellido:
- *                 type: string
- *                 example: "Pérez"
- *               fecha_nacimiento:
- *                 type: string
- *                 format: date
- *                 example: "2000-01-01"
- *               telefono:
- *                 type: integer
- *                 example: 2995555555
- *     responses:
- *       200:
- *         description: "Usuario actualizado correctamente"
- *         content:
- *           application/json:
- *             example:
- *               nuevoToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *               message: "Usuario actualizado correctamente"
- *               result: true
- *       400:
- *         description: "Faltan datos obligatorios o contraseña débil"
- *         content:
- *           application/json:
- *             example:
- *               message: "Faltan datos obligatorios"
- *               result: false
- *       404:
- *         description: "Usuario no encontrado"
- *         content:
- *           application/json:
- *             example:
- *               message: "Usuario no encontrado"
- *               result: false
- *       500:
- *         description: "Error interno del servidor"
- *         content:
- *           application/json:
- *             example:
- *               message: "Algo salió mal: error"
- *               result: false
- */
-router.put("/update", authMiddleware, async (req, res) => {
-  try {
-    const { nombre, email, password, apellido, fecha_nacimiento, telefono, localidad } = req.body;
-
-    if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono || !localidad) {
-      logErrorToPage("Faltan datos obligatorios para la actualización: " + JSON.stringify(req.body));
-      return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
-    }
-
-    if (password.length < 6) {
-      logErrorToPage("Contraseña débil, menos de 6 caracteres para la actualización");
-      return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false }); // contraseña débil
-    }
-
-    logToPage("Hasheando para actualización... 😶‍🌫️");
-    const hashedPassword = await bcrypt.hashSync(password, Number(config.SALT));
-
-    const token = jwt.sign({
-      id: req.user.id,
-      email: email,
-      name: nombre
-    }, config.SECRETO, { expiresIn: "1h" });
-
-    const [result] = await pool.query(
-      "UPDATE usuario SET nombre = ?, email = ?, password = ?, apellido = ?, fecha_nacimiento = ?, telefono = ?, localidad = ? WHERE email = ?",
-      [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad, req.user.email]
-    );
-    if (result.affectedRows === 0) {
-      logErrorToPage("Usuario no encontrado para actualización: ", req.user.email);
-      return res.status(404).json({ message: "Usuario no encontrado", result: false });
-    }
-    logToPage("Usuario actualizado: ", email);
-    res.status(200).json({ nuevoToken: token, message: "Usuario actualizado correctamente", result: true });
-  } catch (error) {
-    logErrorToPage("Error en /update: ", error);
-    return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
-  }
-});
-
-/**
- * @swagger
- * /borrarUsuario:
- *   delete:
- *     tags:
- *       - CRUD Usuarios
- *     summary: "Eliminar un usuario"
- *     description: "Elimina el usuario autenticado. Requiere autenticación."
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *     responses:
- *       200:
- *         description: "Usuario eliminado correctamente"
- *         content:
- *           application/json:
- *             example:
- *               message: "Usuario eliminado correctamente"
- *               result: true
- *       404:
- *         description: "Usuario no encontrado"
- *         content:
- *           application/json:
- *             example:
- *               message: "Usuario no encontrado"
- *               result: false
- *       500:
- *         description: "Error interno del servidor"
- *         content:
- *           application/json:
- *             example:
- *               message: "Algo salió mal: error"
- *               result: false
- */
-router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
-  try {
-    logToPage("Intentando eliminar usuario: ", req.user.email);
-    const [result] = await pool.query("DELETE FROM usuario WHERE email = ?", [req.user.email]);
-    if (result.affectedRows === 0) {
-      logErrorToPage("Usuario no encontrado: ", req.user.email);
-      return res
-        .status(404)
-        .json({ message: "Usuario no encontrado", result: false });
-    }
-    res
-      .status(200)
-      .json({ message: "Usuario eliminado correctamente", result: true });
-    logToPage("Usuario eliminado: ", req.user.email);
-  } catch (error) {
-    logErrorToPage("Error en /borrarUsuario: ", error);
-    return res
-      .status(500)
-      .json({ message: "Algo salió mal: " + error.message, result: false });
-  }
-});
-
-/**
- * @swagger
- * /buscarProfesional:
- *   get:
- *     tags:
- *       - CRUD Usuarios
- *     summary: "Buscar profesionales"
- *     description: "Busca profesionales por nombre o especialidad. Si no se pone nada en leyenda, trae todos los profesionales."
- *     parameters:
- *       - name: token
- *         in: header
- *         required: true
- *         schema:
- *           type: string
- *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *       - name: leyenda
- *         in: query
- *         required: false
- *         schema:
- *           type: string
- *           example: "psicologo"
- *     responses:
- *       200:
- *         description: "Profesionales encontrados"
- *         content:
- *           application/json:
- *             example:
- *               message: "Profesionales encontrados"
- *               result: true
- *               data:
- *                 - nombre: "German"
- *                   apellido: "Lopez"
- *                   email: "german.lopez@example.com"
- *                   localidad: "Argentina"
- *                   especialidad: "psicologo"
- *                   descripcion: "Soy un re psicologo"
- *                   calificacion_promedio: "7.00"
- *                   direccion: "Calle Falsa 123"
- *                 - nombre: "Roma"
- *                   apellido: "Gonzalez"
- *                   email: "roma.gonzalez@example.com"
- *                   localidad: "Argentina"
- *                   especialidad: "Medica"
- *                   descripcion: "Soy una re medica"
- *                   calificacion_promedio: "9.00"
- *                   direccion: "Avenida Siempre Viva 742"
- *       404:
- *         description: "No se encontraron profesionales"
- *         content:
- *           application/json:
- *             example:
- *               message: "No se encontraron profesionales"
- *               result: false
- *       400:
- *         description: "Falta la leyenda del profesional"
- *         content:
- *           application/json:
- *             example:
- *               message: "Falta la leyenda del profesional"
- *               result: false
- *       500:
- *         description: "Error interno del servidor"
- *         content:
- *           application/json:
- *             example:
- *               message: "Algo salió mal: error"
- *               result: false
- */
-router.get("/buscarProfesional", authMiddleware, async (req, res) => {
-  try {
-    const { leyenda } = req.query;
-
-    // if (!leyenda) {
-    //   logErrorToPage("Falta la leyenda del profesional en la búsqueda🧟‍♂️");
-    //   return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
-    // }
-
-    const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion, p.valorConsulta, p.valorConsultaExpress FROM profesional p JOIN usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%` + " || *", `%${leyenda}%`]);
-    if (result.length === 0) {
-      logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
-      return res.status(404).json({ message: "No se encontraron profesionales", result: false });
-    }
-
-    logToPage("Profesionales encontrados para la leyenda: ", leyenda);
-    res.status(200).json({ message: "Profesionales encontrados", result: true, data: result });
-  } catch (error) {
-    logErrorToPage("Error en /buscarProfesional: ", error);
-    return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
-  }
-});
-
-/**
- * @swagger
  * /cambiarClave:
  *   post:
  *     tags:
@@ -898,6 +728,113 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
+ * /update:
+ *   put:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Actualizar un usuario"
+ *     description: "Actualiza los datos del usuario autenticado. Requiere autenticación."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *               nombre:
+ *                 type: string
+ *                 example: "Juan"
+ *               email:
+ *                 type: string
+ *                 example: "juan@mail.com"
+ *               password:
+ *                 type: string
+ *                 example: "123456"
+ *               apellido:
+ *                 type: string
+ *                 example: "Pérez"
+ *               fecha_nacimiento:
+ *                 type: string
+ *                 format: date
+ *                 example: "2000-01-01"
+ *               telefono:
+ *                 type: integer
+ *                 example: 2995555555
+ *     responses:
+ *       200:
+ *         description: "Usuario actualizado correctamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               nuevoToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *               message: "Usuario actualizado correctamente"
+ *               result: true
+ *       400:
+ *         description: "Faltan datos obligatorios o contraseña débil"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Faltan datos obligatorios"
+ *               result: false
+ *       404:
+ *         description: "Usuario no encontrado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Usuario no encontrado"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Algo salió mal: error"
+ *               result: false
+ */
+router.put("/update", authMiddleware, async (req, res) => {
+  try {
+    const { nombre, email, password, apellido, fecha_nacimiento, telefono, localidad } = req.body;
+
+    if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono || !localidad) {
+      logErrorToPage("Faltan datos obligatorios para la actualización: " + JSON.stringify(req.body));
+      return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
+    }
+
+    if (password.length < 6) {
+      logErrorToPage("Contraseña débil, menos de 6 caracteres para la actualización");
+      return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false }); // contraseña débil
+    }
+
+    logToPage("Hasheando para actualización... 😶‍🌫️");
+    const hashedPassword = await bcrypt.hashSync(password, Number(config.SALT));
+
+    const token = jwt.sign({
+      id: req.user.id,
+      email: email,
+      name: nombre
+    }, config.SECRETO, { expiresIn: "1h" });
+
+    const [result] = await pool.query(
+      "UPDATE usuario SET nombre = ?, email = ?, password = ?, apellido = ?, fecha_nacimiento = ?, telefono = ?, localidad = ? WHERE email = ?",
+      [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad, req.user.email]
+    );
+    if (result.affectedRows === 0) {
+      logErrorToPage("Usuario no encontrado para actualización: ", req.user.email);
+      return res.status(404).json({ message: "Usuario no encontrado", result: false });
+    }
+    logToPage("Usuario actualizado: ", email);
+    res.status(200).json({ nuevoToken: token, message: "Usuario actualizado correctamente", result: true });
+  } catch (error) {
+    logErrorToPage("Error en /update: ", error);
+    return res.status(500).json({ message: "Algo salió mal: " + error.message, result: false });
+  }
+});
+
+/**
+ * @swagger
  * /ActualizarValorConsultas:
  *   put:
  *     tags:
@@ -984,4 +921,66 @@ router.put("/ActualizarValorConsultas", authMiddleware, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /borrarUsuario:
+ *   delete:
+ *     tags:
+ *       - CRUD Usuarios
+ *     summary: "Eliminar un usuario"
+ *     description: "Elimina el usuario autenticado. Requiere autenticación."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     responses:
+ *       200:
+ *         description: "Usuario eliminado correctamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Usuario eliminado correctamente"
+ *               result: true
+ *       404:
+ *         description: "Usuario no encontrado"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Usuario no encontrado"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Algo salió mal: error"
+ *               result: false
+ */
+router.delete("/borrarUsuario", authMiddleware, async (req, res) => {
+  try {
+    logToPage("Intentando eliminar usuario: ", req.user.email);
+    const [result] = await pool.query("DELETE FROM usuario WHERE email = ?", [req.user.email]);
+    if (result.affectedRows === 0) {
+      logErrorToPage("Usuario no encontrado: ", req.user.email);
+      return res
+        .status(404)
+        .json({ message: "Usuario no encontrado", result: false });
+    }
+    res
+      .status(200)
+      .json({ message: "Usuario eliminado correctamente", result: true });
+    logToPage("Usuario eliminado: ", req.user.email);
+  } catch (error) {
+    logErrorToPage("Error en /borrarUsuario: ", error);
+    return res
+      .status(500)
+      .json({ message: "Algo salió mal: " + error.message, result: false });
+  }
+});
 export default router;
