@@ -158,7 +158,7 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
     p.calificacion_promedio,
     p.direccion,
     p.valorConsulta,
-    pvalorConsultaExpress,
+    p.valorConsultaExpress,
     CASE
     WHEN p.ID IS NOT NULL THEN 'profesional'
     WHEN pa.ID IS NOT NULL THEN 'paciente'
