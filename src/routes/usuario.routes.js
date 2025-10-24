@@ -10,6 +10,7 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 import { uploadImage } from "../Utils/cloudinary.js";
 import fs from "fs"; // para borrar el archivo temporal
 import { upload } from "../Utils/multer.js";
+import { log } from "console";
 
 /**
  * @swagger
@@ -493,6 +494,7 @@ router.post("/logIn", async (req, res) => {
  *                 fecha_nacimiento: "1985-05-20"
  *                 telefono: 2995551111
  *                 rol: "profesional"
+ *                 localidad: "Argentina"
  *                 especialidad: "Cardiología"
  *                 descripcion: "Médica cardióloga con 10 años de experiencia"
  *                 direccion: "Rio Negro 2170"
@@ -741,28 +743,51 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               token:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *               nombre:
  *                 type: string
- *                 example: "Juan"
  *               email:
  *                 type: string
- *                 example: "juan@mail.com"
  *               password:
  *                 type: string
- *                 example: "123456"
  *               apellido:
  *                 type: string
- *                 example: "Pérez"
  *               fecha_nacimiento:
  *                 type: string
  *                 format: date
- *                 example: "2000-01-01"
  *               telefono:
  *                 type: integer
- *                 example: 2995555555
+ *               localidad:
+ *                 type: string
+ *               especialidad:
+ *                 type: string
+ *               descripcion:
+ *                 type: string
+ *               direccion:
+ *                 type: string
+ *           examples:
+ *             profesional:
+ *               summary: "Ejemplo de update de profesional"
+ *               value:
+ *                 nombre: "Laura"
+ *                 apellido: "García"
+ *                 email: "laura@mail.com"
+ *                 password: "password123"
+ *                 fecha_nacimiento: "1985-05-20"
+ *                 telefono: 2995551111
+ *                 localidad: "Argentina"
+ *                 especialidad: "Cardiología"
+ *                 descripcion: "Médica cardióloga con 10 años de experiencia"
+ *                 direccion: "Rio Negro 2170"
+ *             paciente:
+ *               summary: "Ejemplo de update de paciente"
+ *               value:
+ *                 nombre: "Martín"
+ *                 apellido: "Pérez"
+ *                 email: "martin@mail.com"
+ *                 password: "mypassword"
+ *                 fecha_nacimiento: "1995-09-10"
+ *                 telefono: 2995552222
+ *                 localidad: "Argentina"
  *     responses:
  *       200:
  *         description: "Usuario actualizado correctamente"
@@ -808,6 +833,28 @@ router.put("/update", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false }); // contraseña débil
     }
 
+    logToPage("Verificando si es profesional para actualización... 🧐");
+    const [esProfesional] = await pool.query("SELECT u.ID FROM usuario u JOIN profesional p ON u.ID = p.ID WHERE email = ?", [email]);
+
+
+    if (esProfesional.length > 0) {
+      const { especialidad, descripcion, direccion } = req.body;
+      if (!especialidad || !descripcion || !direccion) {
+        logErrorToPage("Faltan datos obligatorios para la actualización del profesional: " + JSON.stringify(req.body));
+        return res.status(400).json({ message: "Faltan datos obligatorios", result: false });
+      }
+      logToPage("Actualizando datos del profesional: " + email);
+      const [profesional] = await pool.query("UPDATE profesional SET especialidad = ?, descripcion = ?, direccion = ? WHERE ID = ?", [especialidad, descripcion, direccion, esProfesional[0].ID]);
+
+      console.log(profesional);
+
+      if(profesional.affectedRows === 0){
+        logToPage("No se encontraron cambios para la actualización del profesional: " + email);
+        return res.status(404).json({ message: "No se encontraron cambios para la actualización", result: false });
+      }
+    }
+
+
     logToPage("Hasheando para actualización... 😶‍🌫️");
     const hashedPassword = await bcrypt.hashSync(password, Number(config.SALT));
 
@@ -825,7 +872,7 @@ router.put("/update", authMiddleware, async (req, res) => {
       logErrorToPage("Usuario no encontrado para actualización: ", req.user.email);
       return res.status(404).json({ message: "Usuario no encontrado", result: false });
     }
-    logToPage("Usuario actualizado: ", email);
+    logToPage("Usuario actualizado: " + email);
     res.status(200).json({ nuevoToken: token, message: "Usuario actualizado correctamente", result: true });
   } catch (error) {
     logErrorToPage("Error en /update: ", error);

@@ -13,7 +13,7 @@ dotenv.config();
   APISECRET: process.env.CLOUD_API_SECRET,
   // URLs
 
-  FRONTEND_URL: "https://localhost:5173/cambiarClave",
+  FRONTEND_URL: "http://localhost:5173/cambiarClave",
   DB: {
     HOST: process.env.DB_HOST,
     USER: process.env.DB_USER,
@@ -22,12 +22,12 @@ dotenv.config();
   }
   
   // LOCAL
-    // DB: {
-    // HOST:  "localhost",
-    // USER:  "root",
-    // PASSWORD:  "54213",
-    // DATABASE:  "MediTurnos"
-    //    }
+//     DB: {
+//     HOST:  "localhost",
+//     USER:  "root",
+//     PASSWORD:  "54213",
+//     DATABASE:  "MediTurnos"
+//        }
 }
 
 export default config;
