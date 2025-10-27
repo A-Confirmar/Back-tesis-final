@@ -747,8 +747,6 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
  *                 type: string
  *               email:
  *                 type: string
- *               password:
- *                 type: string
  *               apellido:
  *                 type: string
  *               fecha_nacimiento:
@@ -771,7 +769,6 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
  *                 nombre: "Laura"
  *                 apellido: "García"
  *                 email: "laura@mail.com"
- *                 password: "password123"
  *                 fecha_nacimiento: "1985-05-20"
  *                 telefono: 2995551111
  *                 localidad: "Argentina"
@@ -784,7 +781,6 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
  *                 nombre: "Martín"
  *                 apellido: "Pérez"
  *                 email: "martin@mail.com"
- *                 password: "mypassword"
  *                 fecha_nacimiento: "1995-09-10"
  *                 telefono: 2995552222
  *                 localidad: "Argentina"
@@ -821,16 +817,11 @@ router.post("/cambiarClave", authMiddleware, async (req, res) => {
  */
 router.put("/update", authMiddleware, async (req, res) => {
   try {
-    const { nombre, email, password, apellido, fecha_nacimiento, telefono, localidad } = req.body;
+    const { nombre, email, apellido, fecha_nacimiento, telefono, localidad } = req.body;
 
-    if (!email || !password || !nombre || !apellido || !fecha_nacimiento || !telefono || !localidad) {
+    if (!email || !nombre || !apellido || !fecha_nacimiento || !telefono || !localidad) {
       logErrorToPage("Faltan datos obligatorios para la actualización: " + JSON.stringify(req.body));
       return res.status(400).json({ message: "Faltan datos obligatorios", result: false }); // campos incompletos
-    }
-
-    if (password.length < 6) {
-      logErrorToPage("Contraseña débil, menos de 6 caracteres para la actualización");
-      return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres", result: false }); // contraseña débil
     }
 
     logToPage("Verificando si es profesional para actualización... 🧐");
@@ -854,10 +845,6 @@ router.put("/update", authMiddleware, async (req, res) => {
       }
     }
 
-
-    logToPage("Hasheando para actualización... 😶‍🌫️");
-    const hashedPassword = await bcrypt.hashSync(password, Number(config.SALT));
-
     const token = jwt.sign({
       id: req.user.id,
       email: email,
@@ -865,8 +852,8 @@ router.put("/update", authMiddleware, async (req, res) => {
     }, config.SECRETO, { expiresIn: "1h" });
 
     const [result] = await pool.query(
-      "UPDATE usuario SET nombre = ?, email = ?, password = ?, apellido = ?, fecha_nacimiento = ?, telefono = ?, localidad = ? WHERE email = ?",
-      [nombre, email, hashedPassword, apellido, fecha_nacimiento, telefono, localidad, req.user.email]
+      "UPDATE usuario SET nombre = ?, email = ?, apellido = ?, fecha_nacimiento = ?, telefono = ?, localidad = ? WHERE email = ?",
+      [nombre, email, apellido, fecha_nacimiento, telefono, localidad, req.user.email]
     );
     if (result.affectedRows === 0) {
       logErrorToPage("Usuario no encontrado para actualización: ", req.user.email);

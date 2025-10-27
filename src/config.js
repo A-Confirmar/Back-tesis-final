@@ -22,12 +22,12 @@ dotenv.config();
   }
   
   // LOCAL
-//     DB: {
-//     HOST:  "localhost",
-//     USER:  "root",
-//     PASSWORD:  "54213",
-//     DATABASE:  "MediTurnos"
-//        }
+    // DB: {
+    // HOST:  "localhost",
+    // USER:  "root",
+    // PASSWORD:  "54213",
+    // DATABASE:  "MediTurnos"
+    //    }
 }
 
 export default config;
