@@ -66,23 +66,17 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
  */
 router.get("/infoPais", async (req, res) => {
     const urlSoap = "http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?WSDL";
-    logToPage("URL:"+ urlSoap);
-    const {isoCode} = req.query;
     try {
-        logToPage("Conectando con webservice SOAP para /infoPais");
+        logToPage("URL:"+ urlSoap);
+        logToPage("Creando cliente SOAP...");
         const client = await soap.createClientAsync(urlSoap);
-        if(!client){
-            throw new Error("No se pudo crear el cliente SOAP");
-        }
+        logToPage("Cliente SOAP creado.");
 
-
-        const args = { sCountryISOCode: isoCode };
-
-
-        logToPage("llamando a metodo SOAP FullCountryInfo desde /infoPais");
-
+        const args = { sCountryISOCode: req.query.isoCode };
+        logToPage("Llamando a FullCountryInfo con args: " + JSON.stringify(args));
 
         const [full] = await client.FullCountryInfoAsync(args);
+        logToPage("Respuesta SOAP recibida: " + JSON.stringify(full));
 
 
         logToPage("Respuesta SOAP recibida en /infoPais: " + JSON.stringify(full));
