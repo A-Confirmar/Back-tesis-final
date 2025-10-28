@@ -223,6 +223,7 @@ router.get("/obtenerUsuario", authMiddleware, async (req, res) => {
  *                   apellido: "Lopez"
  *                   email: "german.lopez@example.com"
  *                   localidad: "Argentina"
+ *                   imagenPerfil: "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
  *                   especialidad: "psicologo"
  *                   descripcion: "Soy un re psicologo"
  *                   calificacion_promedio: "7.00"
@@ -266,7 +267,7 @@ router.get("/buscarProfesional", authMiddleware, async (req, res) => {
     //   return res.status(400).json({ message: "Falta la leyenda del profesional", result: false });
     // }
 
-    const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion, p.valorConsulta, p.valorConsultaExpress FROM profesional p JOIN usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%` + " || *", `%${leyenda}%`]);
+    const [result] = await pool.query("SELECT u.nombre, u.apellido, u.email, u.localidad, u.imagenPerfil, p.especialidad, p.descripcion, p.calificacion_promedio, p.direccion, p.valorConsulta, p.valorConsultaExpress FROM profesional p JOIN usuario u ON u.ID = p.ID WHERE u.nombre LIKE ? OR p.especialidad LIKE ?", [`%${leyenda}%`, `%${leyenda}%`]);
     if (result.length === 0) {
       logErrorToPage("No se encontraron profesionales para la leyenda: ", leyenda);
       return res.status(404).json({ message: "No se encontraron profesionales", result: false });
