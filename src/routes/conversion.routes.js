@@ -66,6 +66,7 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
  */
 router.get("/infoPais", async (req, res) => {
     const urlSoap = "http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?WSDL";
+    logToPage("URL:"+ urlSoap);
     const {isoCode} = req.query;
     try {
         logToPage("Conectando con webservice SOAP para /infoPais");
@@ -78,7 +79,7 @@ router.get("/infoPais", async (req, res) => {
         const args = { sCountryISOCode: isoCode };
 
 
-        logToPage("llamando a metodo SOAP GetWeather desde /infoPais");
+        logToPage("llamando a metodo SOAP FullCountryInfo desde /infoPais");
 
 
         const [full] = await client.FullCountryInfoAsync(args);
