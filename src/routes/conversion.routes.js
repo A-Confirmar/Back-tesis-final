@@ -68,7 +68,11 @@ router.get("/infoPais", async (req, res) => {
     const urlSoap = "http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?WSDL";
     const {isoCode} = req.query;
     try {
+        logToPage("Conectando con webservice SOAP para /infoPais");
         const client = await soap.createClientAsync(urlSoap);
+        if(!client){
+            throw new Error("No se pudo crear el cliente SOAP");
+        }
 
 
         const args = { sCountryISOCode: isoCode };
