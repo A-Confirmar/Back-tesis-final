@@ -233,13 +233,16 @@ router.get("/tieneResenia", authMiddleware, async (req, res) => {
  *               result: false
  */
 router.get("/verReseniasDeProfesional", authMiddleware, async (req, res) => {
-    const { profesionalID } = req.query;
+    const { profesionalMail } = req.query;
     try {
         logToPage("Verificando si el usuario tiene reseña...");
-        if (!profesionalID) {
+        if (!profesionalMail) {
             return res.status(400).json({ message: "Faltan datos obligatorios para verificar la reseña", result: false });
         }
-        const [reseniaExiste] = await pool.query("SELECT * FROM reseña WHERE profesional_ID = ?", [profesionalID]);
+        const [profesional] = await pool.query("SELECT ID FROM usuario WHERE email = ?", [profesionalMail]);
+        
+        console.log(profesional[0].ID);
+        const [reseniaExiste] = await pool.query("SELECT * FROM reseña WHERE profesional_ID = ?", [profesional[0].ID]);
         logToPage(reseniaExiste);
         if (reseniaExiste.length === 0) {
             return res.status(400).json({ message: "El profesional no tiene reseñas", result: false });
