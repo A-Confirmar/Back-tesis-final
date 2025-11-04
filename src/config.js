@@ -14,20 +14,20 @@ dotenv.config();
   // URLs
 
   FRONTEND_URL: "http://localhost:5173/cambiarClave",
-  // DB: {
-  //   HOST: process.env.DB_HOST,
-  //   USER: process.env.DB_USER,
-  //   PASSWORD: process.env.DB_PASSWORD,
-  //   DATABASE: process.env.DB_NAME
-  // }
+  DB: {
+    HOST: process.env.DB_HOST,
+    USER: process.env.DB_USER,
+    PASSWORD: process.env.DB_PASSWORD,
+    DATABASE: process.env.DB_NAME
+  }
   
   // LOCAL
-    DB: {
-    HOST:  "localhost",
-    USER:  "root",
-    PASSWORD:  "54213",
-    DATABASE:  "MediTurnos"
-       }
+    // DB: {
+    // HOST:  "localhost",
+    // USER:  "root",
+    // PASSWORD:  "54213",
+    // DATABASE:  "MediTurnos"
+    //    }
 }
 
 export default config;

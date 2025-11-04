@@ -189,6 +189,70 @@ router.get("/tieneResenia", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
+ * /verReseñasDeProfesional:
+ *   get:
+ *     tags:
+ *       - CRUD Reseñas
+ *     summary: "Devuelve un true si el usuario ya hizo la reseña al turno relacionado"
+ *     description: "Verifica si el usuario autenticado ya ha realizado una reseña para el turno especificado."
+ *     parameters:
+ *       - name: token
+ *         in: header
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       - name: idTurno
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "123"
+ *     responses:
+ *       200:
+ *         description: "Respuesta exitosa"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Mis reseñas obtenidas exitosamente"
+ *               result: true
+ *       400:
+ *        description: "Error en los datos enviados"
+ *        content:
+ *          application/json:
+ *            example:
+ *              message: "Faltan datos obligatorios para crear la reseña"
+ *              result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error al obtener mis reseñas."
+ *               error: "Error detallado"
+ *               result: false
+ */
+router.get("/verReseniasDeProfesional", authMiddleware, async (req, res) => {
+    const { profesionalID } = req.query;
+    try {
+        logToPage("Verificando si el usuario tiene reseña...");
+        if (!profesionalID) {
+            return res.status(400).json({ message: "Faltan datos obligatorios para verificar la reseña", result: false });
+        }
+        const [reseniaExiste] = await pool.query("SELECT * FROM reseña WHERE profesional_ID = ?", [profesionalID]);
+        logToPage(reseniaExiste);
+        if (reseniaExiste.length === 0) {
+            return res.status(400).json({ message: "El profesional no tiene reseñas", result: false });
+        }
+        res.status(200).json({ message: "Reseñas obtenidas exitosamente", data: reseniaExiste, result: true });
+    } catch (error) {
+        logErrorToPage("❌ Error interno:" + error);
+        res.status(500).json({ message: "Error al verificar la reseña.", error: error.message, result: false });
+    }
+});
+
+/**
+ * @swagger
  * /crearResenia:
  *   post:
  *     tags:
