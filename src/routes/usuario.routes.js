@@ -414,6 +414,7 @@ router.post("/cargarImagenUsuario", authMiddleware, upload.single("imagen"), asy
 router.post("/logIn", async (req, res) => {
   try {
     const { email, password } = req.body;
+    logToPage("datos:"+ email + password)
 
     await pool.query(`set lc_time_names = 'es_ES'`);
     const [rows] = await pool.query(`SELECT id, email, password, nombre FROM usuario WHERE email = ?`, [email]);

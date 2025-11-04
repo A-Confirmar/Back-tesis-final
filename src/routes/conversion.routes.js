@@ -67,7 +67,7 @@ import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 router.get("/infoPais", async (req, res) => {
     const urlSoap = "http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?WSDL";
     try {
-        logToPage("URL:"+ urlSoap);
+
         logToPage("Creando cliente SOAP...");
         const client = await soap.createClientAsync(urlSoap);
         logToPage("Cliente SOAP creado.");
@@ -76,10 +76,8 @@ router.get("/infoPais", async (req, res) => {
         logToPage("Llamando a FullCountryInfo con args: " + JSON.stringify(args));
 
         const [full] = await client.FullCountryInfoAsync(args);
-        logToPage("Respuesta SOAP recibida: " + JSON.stringify(full));
 
 
-        logToPage("Respuesta SOAP recibida en /infoPais: " + JSON.stringify(full));
 
         res.status(200).json({ message: "Conversión exitosa", data: full, result: true });
 
