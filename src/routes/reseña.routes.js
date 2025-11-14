@@ -193,8 +193,8 @@ router.get("/tieneResenia", authMiddleware, async (req, res) => {
  *   get:
  *     tags:
  *       - CRUD Reseñas
- *     summary: "Devuelve un true si el usuario ya hizo la reseña al turno relacionado"
- *     description: "Verifica si el usuario autenticado ya ha realizado una reseña para el turno especificado."
+ *     summary: "Devuelve las reseñas de un profesional dado su email"
+ *     description: "Obtiene todas las reseñas de un profesional específico."
  *     parameters:
  *       - name: token
  *         in: header
@@ -202,26 +202,26 @@ router.get("/tieneResenia", authMiddleware, async (req, res) => {
  *         schema:
  *           type: string
  *           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *       - name: idTurno
+ *       - name: profesionalMail
  *         in: query
  *         required: true
  *         schema:
  *           type: string
- *           example: "123"
+ *           example: "profesional@example.com"
  *     responses:
  *       200:
  *         description: "Respuesta exitosa"
  *         content:
  *           application/json:
  *             example:
- *               message: "Mis reseñas obtenidas exitosamente"
+ *               message: "Reseñas obtenidas exitosamente"
  *               result: true
  *       400:
- *        description: "Error en los datos enviados"
+ *        description: "El profesional no tiene reseñas"
  *        content:
  *          application/json:
  *            example:
- *              message: "Faltan datos obligatorios para crear la reseña"
+ *              message: "El profesional no tiene reseñas"
  *              result: false
  *       500:
  *         description: "Error interno del servidor"

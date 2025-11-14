@@ -9,6 +9,7 @@ import bloqueoRoutes from "./routes/Bloqueo.routes.js";
 import pagosRoutes from "./routes/pagos.routes.js";
 import reseniasRoutes from "./routes/reseña.routes.js";
 import conversionRoutes from "./routes/conversion.routes.js";
+import HistorialClinicoRoutes from "./routes/HistorialClinico.routes.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerJSDoc from "swagger-jsdoc";
 import cookieParser from "cookie-parser";
@@ -59,6 +60,7 @@ app.use(bloqueoRoutes);
 app.use(pagosRoutes);
 app.use(reseniasRoutes);
 app.use(conversionRoutes);
+app.use(HistorialClinicoRoutes);
 app.use(express.json({ limit: "10mb" })); // <- aumentá a lo que necesites
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 cargarRecordatoriosPendientes();
