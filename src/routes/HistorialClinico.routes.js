@@ -46,7 +46,7 @@ router.get("/obtenerTodosMisHistorialesClinicos", authMiddleware, async (req, re
     const pacienteID = req.user.id;
     try {
         logToPage("Obteniendo historial clinico del paciente...");
-        const [historialRows] = await pool.query("SELECT ID, paciente_ID, profesional_ID, DATE_FORMAT(fecha_ultima_actualizacion, '%d-%m-%Y') AS fecha_ultima_actualizacion, diagnostico, tratamiento, evolucion FROM historiaClinica WHERE paciente_ID = ?", [pacienteID]);
+        const [historialRows] = await pool.query("SELECT ID, paciente_ID, profesional_ID, DATE_FORMAT(fecha_ultima_actualizacion, '%d-%m-%Y') AS fecha_ultima_actualizacion, diagnostico, tratamiento, evolucion FROM historiaclinica WHERE paciente_ID = ?", [pacienteID]);
         if (historialRows.length === 0) {
             logErrorToPage("El paciente no tiene un historial clinico.");
             return res.status(404).json({ message: "El paciente no tiene un historial clinico.", result: false });
@@ -121,7 +121,7 @@ router.get("/obtenerHistorialClinicoDelPaciente", authMiddleware, async (req, re
         }
         logToPage("Paciente encontrando: " + pacienteRows[0].ID);
         logToPage("Obteniendo historial clinico del paciente...");
-        const [historialRows] = await pool.query("SELECT ID, paciente_ID, profesional_ID, DATE_FORMAT(fecha_ultima_actualizacion, '%d-%m-%Y') AS fecha_ultima_actualizacion, diagnostico, tratamiento, evolucion FROM historiaClinica WHERE paciente_ID = ? AND profesional_ID = ?", [pacienteRows[0].ID, profesionalID]);
+        const [historialRows] = await pool.query("SELECT ID, paciente_ID, profesional_ID, DATE_FORMAT(fecha_ultima_actualizacion, '%d-%m-%Y') AS fecha_ultima_actualizacion, diagnostico, tratamiento, evolucion FROM historiaclinica WHERE paciente_ID = ? AND profesional_ID = ?", [pacienteRows[0].ID, profesionalID]);
         if (historialRows.length === 0) {
             logErrorToPage("El paciente no tiene un historial clinico con este profesional");
             return res.status(404).json({ message: "El paciente no tiene un historial clinico con este profesional", result: false });
@@ -195,7 +195,7 @@ router.post("/nuevoHistorialClinico", authMiddleware, async (req, res) => {
         logToPage("Paciente encontrando: " + pacienteRows[0].ID);
 
         logToPage("Verifico que no tenga un historial clinico previo...");
-        const [existingHistorial] = await pool.query("SELECT * FROM historiaClinica WHERE paciente_ID = ? AND profesional_ID = ?", [pacienteRows[0].ID, profesionalID]);
+        const [existingHistorial] = await pool.query("SELECT * FROM historiaclinica WHERE paciente_ID = ? AND profesional_ID = ?", [pacienteRows[0].ID, profesionalID]);
         if (existingHistorial.length > 0) {
             logErrorToPage("El paciente ya tiene un historial clinico con este profesional");
             return res.status(400).json({ message: "El paciente ya tiene un historial clinico con este profesional", result: false });
@@ -279,7 +279,7 @@ router.put("/actualizarHistorialClinicoDelPaciente", authMiddleware, async (req,
         }
         logToPage("Paciente encontrando: " + pacienteRows[0].ID);
         logToPage("Actualizando historial clinico del paciente...");
-        const [result] = await pool.query("UPDATE historiaClinica SET fecha_ultima_actualizacion = CURDATE(), diagnostico = ?, tratamiento = ?, evolucion = ? WHERE paciente_ID = ? AND profesional_ID = ?", [diagnostico, tratamiento, evolucion, pacienteRows[0].ID, profesionalID]);
+        const [result] = await pool.query("UPDATE historiaclinica SET fecha_ultima_actualizacion = CURDATE(), diagnostico = ?, tratamiento = ?, evolucion = ? WHERE paciente_ID = ? AND profesional_ID = ?", [diagnostico, tratamiento, evolucion, pacienteRows[0].ID, profesionalID]);
         if (result.affectedRows > 0) {
             return res.status(200).json({ message: "Historial clinico actualizado exitosamente", result: true });
         } else {
@@ -337,7 +337,7 @@ router.delete("/eliminarHistorialClinico", authMiddleware, async (req, res) => {
             return res.status(400).json({ message: "Faltan datos obligatorios", result: false });
         }
         logToPage("Eliminando historial clinico...");
-        const [result] = await pool.query("DELETE FROM historiaClinica WHERE ID = ?", [historialID]);
+        const [result] = await pool.query("DELETE FROM historiaclinica WHERE ID = ?", [historialID]);
         if (result.affectedRows > 0) {
             return res.status(200).json({ message: "Historial clinico eliminado exitosamente", result: true });
         } else {
