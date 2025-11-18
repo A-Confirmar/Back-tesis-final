@@ -11,6 +11,7 @@ export const recordatorioDeTurno = async (nombrePaciente, emailPaciente, profesi
         let [hours, minutes] = hora_inicio.split(':').map(Number);
         const seconds = 0;
         const fechaTurno = new Date(year, month - 1, day, hours, minutes, seconds);
+        logToPage(`Fecha y hora del turno: ${fechaTurno}`);
 
 
         const fechaRecordatorio = new Date(fechaTurno.getTime() - 60 * 60 * 1000); // 1h antes

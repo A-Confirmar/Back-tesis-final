@@ -2,7 +2,7 @@ import { Router } from "express";
 const router = Router();
 import pool from "../db.js";
 import { recordatorioDeTurno, cancelarRecordatorioDeTurno } from "../Utils/recordatorios.js";
-import { enviarMailConfirmacionTurno, enviarMailCancelacionTurno, enviarMailSolicitudExpress, enviarMailConfirmacionTurnoExpress } from "../Utils/mailer.js";
+import { enviarMailConfirmacionTurno, enviarMailCancelacionTurno, enviarMailSolicitudExpress, enviarMailConfirmacionTurnoExpress, enviarMailEsperaTurnoExpress } from "../Utils/mailer.js";
 import { logErrorToPage, logToPage } from "../Utils/consolaViva.js";
 import { obtenerDiaSemana } from "../Utils/obtenerDiaSemana.js";
 
@@ -460,11 +460,11 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
- * /nuevoTurno:
+ * /solicitarNuevoTurnoExpress:
  *   post:
  *     tags:
- *       - CRUD Turnos
- *     summary: "Crear nuevo turno tipo express, le manda un mail al profesional notificando la solicitud (no se genera pago hasta que confirme el turno)"
+ *       - CRUD Turnos Express
+ *     summary: "Crear nuevo turno tipo express, le manda un mail al profesional notificando la solicitud"
  *     description: "Crea un nuevo turno tipo express y notifica al profesional. Requiere autenticación."
  *     security:
  *       - bearerAuth: []
@@ -476,24 +476,18 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
  *             type: object
  *             required:
  *               - emailProfesional
- *               - fecha
  *             properties:
  *               emailProfesional:
  *                 type: string
  *                 example: "doctor@mail.com"
  *                 description: "Correo electrónico del profesional"
- *               fecha:
- *                 type: string
- *                 format: date
- *                 example: "2025-10-03"
- *                 description: "Fecha del turno (YYYY-MM-DD)"
  *     responses:
- *       201:
- *         description: "Turno express creado exitosamente"
+ *       200:
+ *         description: "Turno express solicitado exitosamente"
  *         content:
  *           application/json:
  *             example:
- *               message: "Turno express creado exitosamente"
+ *               message: "Turno express solicitado exitosamente"
  *               result: true
  *               turnoId: 123
  *       400:
@@ -503,13 +497,6 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
  *             example:
  *               message: "Faltan datos obligatorios"
  *               result: false
- *       401:
- *         description: "Token inválido o no enviado"
- *         content:
- *           application/json:
- *             example:
- *               message: "Token requerido"
- *               result: false
  *       500:
  *         description: "Error al crear turno express"
  *         content:
@@ -518,89 +505,52 @@ router.post("/nuevoTurno", authMiddleware, async (req, res) => {
  *               message: "Error al crear turno express"
  *               result: false
  */
-router.post("/nuevoTurnoExpress", authMiddleware, async (req, res) => {
-    const conexión = await pool.getConnection();
+router.post("/solicitarNuevoTurnoExpress", authMiddleware, async (req, res) => {
     try {
         const user = req.user; // Usuario autenticado
         const { emailProfesional } = req.body;
+        const [profesionalRows] = await pool.query("SELECT ID, nombre, apellido FROM usuario WHERE email = ?", [emailProfesional]);
 
-        if (!emailProfesional)
+        if (!emailProfesional) {
+            logToPage("Faltan datos obligatorios para solicitar turno express.");
             return res.status(400).json({
                 message: "Faltan datos obligatorios",
                 result: false
             });
+        }
 
-        await conexión.beginTransaction();
-        await conexión.query("set lc_time_names = 'es_ES';");
-        await conexión.query("SET time_zone = '-03:00'");
-        logToPage(`Verificando que sea fuera de la  disponibilidad del profesional con email ${emailProfesional}`);
-        const [disponiblesAhora] = await conexión.query(`
-                  SELECT *
-                  FROM disponibilidad d
-                  JOIN usuario u ON d.profesional_ID = u.ID
-                  WHERE u.email = ?
-                  AND LOWER(d.dia_semana) = LOWER(DAYNAME(CURDATE()))
-                  AND CURTIME() BETWEEN d.hora_inicio AND d.hora_fin
-                `, [emailProfesional]);
+        const [expressExistente] = await pool.query("SELECT * FROM turno t JOIN usuario u ON u.ID = t.profesional_ID WHERE u.email = ? AND t.tipo = 'express' AND t.paciente_ID = ?", [emailProfesional, user.id]);
 
-
-
-        let turnoExistente;
-        if (disponiblesAhora.length === 0) {
-            logToPage(`El profesional con email ${emailProfesional} no esta dentro del rango de disponibilidad.`);
-            logToPage(`Verificando si ya existe un turno para el profesional con email ${emailProfesional}`);
-            [turnoExistente] = await conexión.query(
-                "SELECT * FROM turno t JOIN usuario u ON u.ID = t.profesional_ID WHERE u.email = ? AND fecha = CURDATE() AND CURTIME() BETWEEN t.hora_inicio AND t.hora_fin",
-                [emailProfesional]
-            );
-        } else {
-            logErrorToPage(`El profesional con email ${emailProfesional} tiene disponibilidad ahora mismo. no es necesario crear un turno express.`);
+        if (expressExistente.length > 0) {
+            logToPage("Ya existe un turno express solicitado con este profesional.");
             return res.status(400).json({
-                message: "El profesional SÍ tiene disponibilidad en ese horario. no es necesario crear un turno express.",
+                message: "Ya existe un turno express solicitado con este profesional",
                 result: false
             });
         }
 
-        const [profesionalRows] = await conexión.query("SELECT ID, nombre, apellido FROM usuario WHERE email = ?", [emailProfesional]);
-
-        if (turnoExistente.length > 0) {
-            logErrorToPage(`Ya existe un turno para el profesional con email ${emailProfesional} en este momento.`);
-            return res.status(400).json({
-                message: "Ya existe un turno en este momento actual.",
-                result: false
-            });
-        }
-        // Insertar el nuevo turno
-        logToPage(`Creando nuevo turno para el usuario ${user.email} con el profesional ${emailProfesional} en este momento. (ESTADO PENDIENTE A LA ESPERA DE RESPUESTA DEL PROFESIONAL)`);
-
-
-        const [reserva] = await conexión.query(
-            "INSERT INTO turno (paciente_ID, profesional_ID, fecha, hora_inicio, hora_fin, tipo, estado) VALUES (?, ?, CURDATE(), CURTIME(), CURTIME() + INTERVAL 30 MINUTE, 'Express', 'pendiente')",
+        logToPage(`Solicitando turno express para el usuario ${user.email} con el profesional ${emailProfesional}`);
+        const [reserva] = await pool.query(
+            "INSERT INTO turno (paciente_ID, profesional_ID, fecha, hora_inicio, hora_fin, tipo, estado) VALUES (?, ?, DATE_SUB(CURDATE(), INTERVAL 1 DAY), '00:00:00', '00:00:00', 'express', 'espera')",
             [user.id, profesionalRows[0].ID]
         );
 
+        logToPage(`Turno express solicitado exitosamente`);
         if (reserva.affectedRows === 1) {
-            logToPage(`Turno creado exitosamente con ID ${reserva.insertId}, a la espera de confirmación del profesional.`);
-
-            logToPage("Enviando solicitud de confirmación al profesional.");
             enviarMailSolicitudExpress(emailProfesional, user.name, profesionalRows[0]);
-            res.status(201).json({
-                message: "Turno express creado exitosamente, esperando respuesta del profesional:" + profesionalRows[0].nombre + " " + profesionalRows[0].apellido,
+            res.status(200).json({
+                message: "Turno express solicitado exitosamente",
                 turnoId: reserva.insertId,
                 result: true
             });
         }
 
-        await conexión.commit();
     } catch (error) {
-        await conexión.rollback();
-        logErrorToPage("Error al crear turno express:", error);
+        logErrorToPage("Error al solicitar turno express:", error);
         res.status(500).json({
-            message: "Error al crear turno express: " + error.message,
+            message: "Error al solicitar turno express: " + error.message,
             result: false
         });
-    } finally {
-        await conexión.release();
     }
 });
 
@@ -685,19 +635,22 @@ router.put("/cancelarTurno", authMiddleware, async (req, res) => {
 
 /**
  * @swagger
- * /confirmarTurnoExpress:
+ * /aceptarTurnoExpress:
  *   put:
  *     tags:
- *       - CRUD Turnos
- *     summary: "Actualizar estado del turno express a confirmado"
- *     description: "Actualiza el estado de un turno express existente a confirmado (requiere autenticación profesional)"
+ *       - CRUD Turnos Express
+ *     summary: "Actualizar el horario del turno proporcionado por el profesional y el turno queda a la espera de respuesta del paciente."
+ *     description: "Actualizar el horario del turno proporcionado por el profesional y el turno queda a la espera de respuesta del paciente."
  *     parameters:
  *       - in: body
  *         name: body
- *         description: "ID del turno a confirmar"
+ *         description: "ID del turno a aceptar"
  *         required:
  *           - token
  *           - turnoId
+ *           - inicio
+ *           - fin
+ *           - fecha
  *         schema:
  *           type: object
  *           properties:
@@ -707,61 +660,134 @@ router.put("/cancelarTurno", authMiddleware, async (req, res) => {
  *             turnoId:
  *               type: integer
  *               example: 1
+ *             inicio:
+ *               type: string
+ *               example: "10:00"
+ *             fin:
+ *               type: string
+ *               example: "10:30"
+ *             fecha:
+ *               type: string
+ *               example: "2024-06-15"
  *     responses:
  *       200:
- *         description: "Turno confirmado exitosamente"
+ *         description: "Turno Aceptado exitosamente"
  *       404:
  *         description: "Turno no encontrado"
  *       500:
- *         description: "Error al confirmar turno"
+ *         description: "Error al aceptar turno"
  */
-router.put("/confirmarTurnoExpress", authMiddleware, async (req, res) => {
-    const conexión = await pool.getConnection();
+router.put("/aceptarTurnoExpress", authMiddleware, async (req, res) => {
     try {
         const user = req.user; // Usuario autenticado
-        const { turnoId } = req.body;
+        const { turnoId, inicio, fin, fecha } = req.body;
         const [rows] = await pool.query("SELECT u.ID, u.email, u.nombre, u.apellido, t.hora_inicio, DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fecha FROM turno t JOIN usuario u ON t.profesional_ID = u.ID WHERE t.ID = ? AND t.profesional_ID = ?", [turnoId, user.id]);
 
         if (rows.length === 0) {
             logErrorToPage(`El turno con ID ${turnoId} no existe o no pertenece al usuario con email ${user.email}`);
             return res.status(404).json({
-                message: "Turno no encontrado para confirmar",
+                message: "Turno no encontrado para aceptar",
                 result: false
             });
         }
 
-        logToPage("Generando pago relacionado al turno en PENDIENTE.")
-
-        const [pago] = await conexión.query("INSERT INTO pago (turno_ID, monto, estado) VALUES (?,(SELECT valorConsultaExpress FROM profesional WHERE ID = ?), 'pendiente')", [turnoId, user.id]);
-
-        if (pago.affectedRows === 1) {
-            logToPage(`Pago generado exitosamente con ID ${pago.insertId}`);
-        } else {
-            conexión.rollback();
-            logErrorToPage(`Error al generar pago para el turno ID ${reserva.insertId}`);
-        }
 
         const [paciente] = await pool.query("SELECT nombre, email FROM usuario WHERE id = (SELECT paciente_ID FROM turno WHERE id = ?)", [turnoId]);
 
-        // Confirmar el turno de la base de datos
-        const [result] = await conexión.query("UPDATE turno SET estado = 'confirmado' WHERE id = ? AND profesional_ID = ?", [turnoId, user.id]);
+        // aceptar el turno de la base de datos
+        const [result] = await pool.query("UPDATE turno SET hora_inicio = ?, hora_fin = ?, fecha = ?, estado = 'pendiente' WHERE id = ? AND profesional_ID = ?", [inicio, fin, fecha, turnoId, user.id]);
 
 
 
-        await conexión.commit();
+
         if (result.changedRows === 1) {
-            logToPage(`Turno con ID ${turnoId} confirmado exitosamente para el usuario con email ${user.email}`);
-            enviarMailConfirmacionTurnoExpress(paciente[0].email, paciente[0].nombre, user.name);
+            logToPage(`Turno con ID ${turnoId} aceptado exitosamente. horarios y fechas actualizados por el profesional con email ${user.email}`);
+            enviarMailEsperaTurnoExpress(paciente[0].email, paciente[0].nombre, user.name, fecha, inicio, fin);
             res.status(200).json({
-                message: "Turno confirmado exitosamente",
+                message: "Turno aceptado exitosamente",
                 result: true
             });
         } else {
-            conexión.rollback();
+
             logErrorToPage(`No se pudo encontrar el turno con ID ${turnoId} para el usuario con email ${user.email}`);
             res.status(404).json({
                 message: "Turno no encontrado",
                 result: false
+            });
+        }
+    } catch (error) {
+        logErrorToPage("Error al confirmar el turno:", error);
+        res.status(500).json({
+            message: "Error al confirmar el turno: " + error.message,
+            result: false
+        });
+    }
+});
+
+
+router.put("/confirmarTurnoExpress", authMiddleware, async (req, res) => {
+    const conexión = await pool.getConnection();
+    try {
+        const { turnoId } = req.body;
+        const user = req.user; // Usuario autenticado
+
+        if (!turnoId) {
+            logErrorToPage("Faltan datos obligatorios para confirmar turno express.");
+            return res.status(400).json({
+                message: "Faltan datos obligatorios",
+                result: false
+            });
+        }
+
+        const [turnoRows] = await pool.query("SELECT ID, estado, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, hora_inicio FROM turno WHERE ID = ? AND tipo = 'express'", [turnoId]);
+
+
+        if (turnoRows.length === 0) {
+            logErrorToPage(`El turno con ID ${turnoId} no existe o no es de tipo express.`);
+            return res.status(404).json({
+                message: "Turno no encontrado para confirmar",
+                result: false
+            });
+        } else if (turnoRows[0].estado !== 'pendiente') {
+            logErrorToPage(`El turno con ID ${turnoId} no está en estado pendiente y no puede ser confirmado.`);
+            return res.status(400).json({
+                message: "El turno no está en estado pendiente",
+                result: false
+            });
+        }
+
+        await conexión.beginTransaction();
+        logToPage(`Confirmando turno express con ID ${turnoId}`);
+        const [result] = await conexión.query("UPDATE turno SET estado = 'confirmado' WHERE ID = ?", [turnoId]);
+
+        const [paciente] = await pool.query("SELECT nombre, email FROM usuario WHERE id = (SELECT paciente_ID FROM turno WHERE id = ?)", [turnoId]);
+        const [profesional] = await pool.query("SELECT nombre, apellido, email FROM usuario WHERE id = (SELECT profesional_ID FROM turno WHERE id = ?)", [turnoId]);
+
+        if (result.changedRows === 1) {
+
+            logToPage(`Programando recordatorio para el turno ID ${turnoRows[0].ID}`);
+            recordatorioDeTurno(paciente[0].nombre, user.email, profesional[0], turnoRows[0].fecha, turnoRows[0].hora_inicio, turnoRows[0].ID);
+
+            enviarMailConfirmacionTurnoExpress(paciente[0].email, paciente[0].nombre, turnoRows[0].fecha, turnoRows[0].hora_inicio)//paciente
+            enviarMailConfirmacionTurnoExpress(profesional[0].email, profesional[0].nombre, turnoRows[0].fecha, turnoRows[0].hora_inicio)//profesional
+            logToPage(`Turno con ID ${turnoId} confirmado exitosamente.`);
+
+
+            logToPage("Generando pago relacionado al turno en PENDIENTE.")
+
+            const [pago] = await conexión.query("INSERT INTO pago (turno_ID, monto, estado) VALUES (?,(SELECT valorConsultaExpress FROM profesional WHERE ID = (SELECT profesional_ID FROM turno WHERE ID = ?)), 'pendiente')", [turnoId, turnoId]);
+
+            if (pago.affectedRows === 1) {
+                logToPage(`Pago generado exitosamente con ID ${pago.insertId}`);
+            } else {
+                conexión.rollback();
+                logErrorToPage(`Error al generar pago para el turno ID ${reserva.insertId}`);
+            }
+
+            conexión.commit();
+            res.status(200).json({
+                message: "Turno confirmado exitosamente",
+                result: true
             });
         }
     } catch (error) {
@@ -771,11 +797,19 @@ router.put("/confirmarTurnoExpress", authMiddleware, async (req, res) => {
             message: "Error al confirmar el turno: " + error.message,
             result: false
         });
-    }finally {
+    } finally {
         await conexión.release();
     }
-});
 
+
+
+
+
+
+
+
+
+});
 
 
 
