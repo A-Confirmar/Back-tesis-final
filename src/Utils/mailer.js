@@ -121,7 +121,7 @@ export async function enviarMailSolicitudExpress(to, nombrePaciente, profesional
       <div style="margin-bottom:16px; text-align:center; font-size:18px;">
           <b>Hola ${profesionalRows.nombre} ${profesionalRows.apellido}, ${nombrePaciente} ha solicitado un turno express con usted.</b> <br/>
           <b>Por favor, revise su agenda para confirmar o denegar la solicitud.</b> <br/>
-          <a href="https://medi-turnos-front.vercel.app/" style="color: #FFFFFF; border:1px solid #1a73e8; padding:8px 12px; text-decoration:none; border-radius:4px; margin-top:12px; display:inline-block; background-color: #0432ffff;">Ver</a> <br/>
+          <a href="http://localhost:5173/profesional/turnos-express" style="color: #FFFFFF; border:1px solid #1a73e8; padding:8px 12px; text-decoration:none; border-radius:4px; margin-top:12px; display:inline-block; background-color: #0432ffff;">Ver</a> <br/>
           </div>
           </div>${footer}`
         });
@@ -154,7 +154,7 @@ export async function enviarMailSolicitudExpress(to, nombrePaciente, profesional
           <b>Hola ${nombrePaciente}, su turno express ha sido aceptado por el profesional ${nombreProfesional} ahora mismo.</b> <br/>
           <b>Su turno es el dia ${fecha} de ${hora_inicio} a ${hora_fin}.</b> <br/>
           <b>Para poder confirmarlo, debe ingresar a su agenda de turnos y confirmar el mismo.</b> <br/>
-          <a href="https://medi-turnos-front.vercel.app/" style="color: #FFFFFF; border:1px solid #1a73e8; padding:8px 12px; text-decoration:none; border-radius:4px; margin-top:12px; display:inline-block; background-color: #0432ffff;">Ver</a> <br/>
+          <a href="http://localhost:5173/mis-turnos" style="color: #FFFFFF; border:1px solid #1a73e8; padding:8px 12px; text-decoration:none; border-radius:4px; margin-top:12px; display:inline-block; background-color: #0432ffff;">Ver</a> <br/>
 
       </div>
   </div>${footer}`
