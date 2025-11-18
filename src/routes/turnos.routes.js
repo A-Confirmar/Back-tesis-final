@@ -724,7 +724,59 @@ router.put("/aceptarTurnoExpress", authMiddleware, async (req, res) => {
     }
 });
 
-
+/**
+ * @swagger
+ * /confirmarTurnoExpress:
+ *   put:
+ *     tags:
+ *       - CRUD Turnos Express
+ *     summary: "Confirmar turno express"
+ *     description: "Confirma un turno de tipo 'express' (debe estar en estado 'pendiente'), genera el pago en estado 'pendiente' y programa el recordatorio."
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - turnoId
+ *             properties:
+ *               turnoId:
+ *                 type: integer
+ *                 example: 123
+ *                 description: "ID del turno express a confirmar"
+ *     responses:
+ *       200:
+ *         description: "Turno confirmado exitosamente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Turno confirmado exitosamente"
+ *               result: true
+ *       400:
+ *         description: "Faltan datos obligatorios o el turno no está en estado pendiente"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Faltan datos obligatorios"
+ *               result: false
+ *       404:
+ *         description: "Turno no encontrado o no es de tipo express"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Turno no encontrado para confirmar"
+ *               result: false
+ *       500:
+ *         description: "Error interno del servidor"
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: "Error al confirmar el turno: <detalle>"
+ *               result: false
+ */
 router.put("/confirmarTurnoExpress", authMiddleware, async (req, res) => {
     const conexión = await pool.getConnection();
     try {
