@@ -73,6 +73,7 @@ router.get("/buscarTurno", authMiddleware, async (req, res) => {
                 t.hora_fin,
                 t.estado,
                 t.tipo,
+                t.expressAceptado,
                 up.nombre AS nombreProfesional,
                 up.apellido AS apellidoProfesional
             FROM turno t
@@ -165,7 +166,8 @@ router.get("/obtenerMisTurnosConfirmado", authMiddleware, async (req, res) => {
             t.hora_inicio, 
             t.hora_fin, 
             t.estado, 
-            t.tipo 
+            t.tipo,
+            t.expressAceptado
             FROM turno t 
             JOIN usuario u ON t.paciente_ID = u.ID 
             JOIN usuario up ON t.profesional_ID = up.ID 
@@ -254,7 +256,8 @@ router.get("/obtenerMisTurnos", authMiddleware, async (req, res) => {
             t.hora_inicio, 
             t.hora_fin, 
             t.estado, 
-            t.tipo 
+            t.tipo,
+            t.expressAceptado
             FROM turno t 
             JOIN usuario u ON t.paciente_ID = u.ID 
             JOIN usuario up ON t.profesional_ID = up.ID 
@@ -531,7 +534,7 @@ router.post("/solicitarNuevoTurnoExpress", authMiddleware, async (req, res) => {
 
         logToPage(`Solicitando turno express para el usuario ${user.email} con el profesional ${emailProfesional}`);
         const [reserva] = await pool.query(
-            "INSERT INTO turno (paciente_ID, profesional_ID, fecha, hora_inicio, hora_fin, tipo, estado) VALUES (?, ?, DATE_SUB(CURDATE(), INTERVAL 1 DAY), '00:00:00', '00:00:00', 'express', 'espera')",
+            "INSERT INTO turno (paciente_ID, profesional_ID, fecha, hora_inicio, hora_fin, tipo, estado, expressAceptado) VALUES (?, ?, DATE_SUB(CURDATE(), INTERVAL 1 DAY), '00:00:00', '00:00:00', 'express', 'pendiente', 0 )",
             [user.id, profesionalRows[0].ID]
         );
 
@@ -681,7 +684,7 @@ router.put("/aceptarTurnoExpress", authMiddleware, async (req, res) => {
     try {
         const user = req.user; // Usuario autenticado
         const { turnoId, inicio, fin, fecha } = req.body;
-        const [rows] = await pool.query("SELECT u.ID, u.email, u.nombre, u.apellido, t.hora_inicio, DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fecha FROM turno t JOIN usuario u ON t.profesional_ID = u.ID WHERE t.ID = ? AND t.profesional_ID = ?", [turnoId, user.id]);
+        const [rows] = await pool.query("SELECT u.ID, u.email, u.nombre, u.apellido, t.hora_inicio, DATE_FORMAT(t.fecha, '%d-%m-%Y') AS fecha, expressAceptado FROM turno t JOIN usuario u ON t.profesional_ID = u.ID WHERE t.ID = ? AND t.profesional_ID = ?", [turnoId, user.id]);
 
         if (rows.length === 0) {
             logErrorToPage(`El turno con ID ${turnoId} no existe o no pertenece al usuario con email ${user.email}`);
@@ -691,11 +694,19 @@ router.put("/aceptarTurnoExpress", authMiddleware, async (req, res) => {
             });
         }
 
+        if(rows[0].expressAceptado){
+            logToPage("Este turno ya fue aceptado previamente.");
+            return  res.status(400).json({
+                message: "Este turno ya fue aceptado previamente.",
+                result: false
+            });
+        }
+
 
         const [paciente] = await pool.query("SELECT nombre, email FROM usuario WHERE id = (SELECT paciente_ID FROM turno WHERE id = ?)", [turnoId]);
 
         // aceptar el turno de la base de datos
-        const [result] = await pool.query("UPDATE turno SET hora_inicio = ?, hora_fin = ?, fecha = ?, estado = 'pendiente' WHERE id = ? AND profesional_ID = ?", [inicio, fin, fecha, turnoId, user.id]);
+        const [result] = await pool.query("UPDATE turno SET hora_inicio = ?, hora_fin = ?, fecha = ?, expressAceptado = 1 WHERE id = ? AND profesional_ID = ?", [inicio, fin, fecha, turnoId, user.id]);
 
 
 
@@ -791,7 +802,7 @@ router.put("/confirmarTurnoExpress", authMiddleware, async (req, res) => {
             });
         }
 
-        const [turnoRows] = await pool.query("SELECT ID, estado, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, hora_inicio FROM turno WHERE ID = ? AND tipo = 'express'", [turnoId]);
+        const [turnoRows] = await pool.query("SELECT ID, estado, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, hora_inicio, expressAceptado FROM turno WHERE ID = ? AND tipo = 'express'", [turnoId]);
 
 
         if (turnoRows.length === 0) {
@@ -800,10 +811,10 @@ router.put("/confirmarTurnoExpress", authMiddleware, async (req, res) => {
                 message: "Turno no encontrado para confirmar",
                 result: false
             });
-        } else if (turnoRows[0].estado !== 'pendiente') {
-            logErrorToPage(`El turno con ID ${turnoId} no está en estado pendiente y no puede ser confirmado.`);
+        } else if (turnoRows[0].expressAceptado !== 1) {
+            logErrorToPage(`El turno con ID ${turnoId} no está en estado aceptado y no puede ser confirmado.`);
             return res.status(400).json({
-                message: "El turno no está en estado pendiente",
+                message: "El turno no fue aceptado por el profesional y no puede ser confirmado.",
                 result: false
             });
         }
