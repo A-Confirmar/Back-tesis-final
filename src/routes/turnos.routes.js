@@ -522,7 +522,7 @@ router.post("/solicitarNuevoTurnoExpress", authMiddleware, async (req, res) => {
             });
         }
 
-        const [expressExistente] = await pool.query("SELECT * FROM turno t JOIN usuario u ON u.ID = t.profesional_ID WHERE u.email = ? AND t.tipo = 'express' AND t.paciente_ID = ?", [emailProfesional, user.id]);
+        const [expressExistente] = await pool.query("SELECT * FROM turno t JOIN usuario u ON u.ID = t.profesional_ID WHERE u.email = ? AND t.tipo = 'express' AND t.paciente_ID = ? AND t.estado = 'pendiente'", [emailProfesional, user.id]);
 
         if (expressExistente.length > 0) {
             logToPage("Ya existe un turno express solicitado con este profesional.");
